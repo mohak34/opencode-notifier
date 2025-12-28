@@ -8,7 +8,7 @@ import type { EventType } from "./config"
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 function getBundledSoundPath(event: EventType): string {
-  return join(__dirname, "..", "sounds", `${event}.wav`)
+  return join(__dirname, "sounds", `${event}.wav`)
 }
 
 function getSoundFilePath(event: EventType, customPath: string | null): string | null {

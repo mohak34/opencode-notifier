@@ -1,5 +1,5 @@
 import type { Plugin } from "@opencode-ai/plugin"
-import { loadConfig, isEventEnabled, getMessage, getSoundPath } from "./config"
+import { loadConfig, isEventSoundEnabled, isEventNotificationEnabled, getMessage, getSoundPath } from "./config"
 import type { EventType, NotifierConfig } from "./config"
 import { sendNotification } from "./notify"
 import { playSound } from "./sound"
@@ -8,18 +8,14 @@ async function handleEvent(
   config: NotifierConfig,
   eventType: EventType
 ): Promise<void> {
-  if (!isEventEnabled(config, eventType)) {
-    return
-  }
-
   const promises: Promise<void>[] = []
 
-  if (config.notification) {
+  if (isEventNotificationEnabled(config, eventType)) {
     const message = getMessage(config, eventType)
-    promises.push(sendNotification(message, eventType))
+    promises.push(sendNotification(message, config.timeout))
   }
 
-  if (config.sound) {
+  if (isEventSoundEnabled(config, eventType)) {
     const customSoundPath = getSoundPath(config, eventType)
     promises.push(playSound(eventType, customSoundPath))
   }

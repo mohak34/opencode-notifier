@@ -4,13 +4,19 @@ import { homedir } from "os"
 
 export type EventType = "permission" | "complete" | "error"
 
+export interface EventConfig {
+  sound: boolean
+  notification: boolean
+}
+
 export interface NotifierConfig {
   sound: boolean
   notification: boolean
+  timeout: number
   events: {
-    permission: boolean
-    complete: boolean
-    error: boolean
+    permission: EventConfig
+    complete: EventConfig
+    error: EventConfig
   }
   messages: {
     permission: string
@@ -24,13 +30,19 @@ export interface NotifierConfig {
   }
 }
 
+const DEFAULT_EVENT_CONFIG: EventConfig = {
+  sound: true,
+  notification: true,
+}
+
 const DEFAULT_CONFIG: NotifierConfig = {
   sound: true,
   notification: true,
+  timeout: 5,
   events: {
-    permission: true,
-    complete: true,
-    error: true,
+    permission: { ...DEFAULT_EVENT_CONFIG },
+    complete: { ...DEFAULT_EVENT_CONFIG },
+    error: { ...DEFAULT_EVENT_CONFIG },
   },
   messages: {
     permission: "OpenCode needs permission",
@@ -48,6 +60,27 @@ function getConfigPath(): string {
   return join(homedir(), ".config", "opencode", "opencode-notifier.json")
 }
 
+function parseEventConfig(
+  userEvent: boolean | { sound?: boolean; notification?: boolean } | undefined,
+  defaultConfig: EventConfig
+): EventConfig {
+  if (userEvent === undefined) {
+    return defaultConfig
+  }
+
+  if (typeof userEvent === "boolean") {
+    return {
+      sound: userEvent,
+      notification: userEvent,
+    }
+  }
+
+  return {
+    sound: userEvent.sound ?? defaultConfig.sound,
+    notification: userEvent.notification ?? defaultConfig.notification,
+  }
+}
+
 export function loadConfig(): NotifierConfig {
   const configPath = getConfigPath()
 
@@ -59,13 +92,22 @@ export function loadConfig(): NotifierConfig {
     const fileContent = readFileSync(configPath, "utf-8")
     const userConfig = JSON.parse(fileContent)
 
+    const globalSound = userConfig.sound ?? DEFAULT_CONFIG.sound
+    const globalNotification = userConfig.notification ?? DEFAULT_CONFIG.notification
+
+    const defaultWithGlobal: EventConfig = {
+      sound: globalSound,
+      notification: globalNotification,
+    }
+
     return {
-      sound: userConfig.sound ?? DEFAULT_CONFIG.sound,
-      notification: userConfig.notification ?? DEFAULT_CONFIG.notification,
+      sound: globalSound,
+      notification: globalNotification,
+      timeout: userConfig.timeout ?? DEFAULT_CONFIG.timeout,
       events: {
-        permission: userConfig.events?.permission ?? DEFAULT_CONFIG.events.permission,
-        complete: userConfig.events?.complete ?? DEFAULT_CONFIG.events.complete,
-        error: userConfig.events?.error ?? DEFAULT_CONFIG.events.error,
+        permission: parseEventConfig(userConfig.events?.permission, defaultWithGlobal),
+        complete: parseEventConfig(userConfig.events?.complete, defaultWithGlobal),
+        error: parseEventConfig(userConfig.events?.error, defaultWithGlobal),
       },
       messages: {
         permission: userConfig.messages?.permission ?? DEFAULT_CONFIG.messages.permission,
@@ -83,8 +125,12 @@ export function loadConfig(): NotifierConfig {
   }
 }
 
-export function isEventEnabled(config: NotifierConfig, event: EventType): boolean {
-  return config.events[event]
+export function isEventSoundEnabled(config: NotifierConfig, event: EventType): boolean {
+  return config.events[event].sound
+}
+
+export function isEventNotificationEnabled(config: NotifierConfig, event: EventType): boolean {
+  return config.events[event].notification
 }
 
 export function getMessage(config: NotifierConfig, event: EventType): string {

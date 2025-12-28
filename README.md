@@ -1,18 +1,12 @@
 # opencode-notifier
 
-OpenCode plugin that sends system notifications and plays sounds when:
-- Permission is needed
-- Generation completes
-- Errors occur
-
-Works on macOS, Linux, and Windows.
+OpenCode plugin that plays sounds and sends system notifications when permission is needed, generation completes, or errors occur. Works on macOS, Linux, and Windows.
 
 ## Installation
 
 Add the plugin to your OpenCode config:
 
 ```json
-// ~/.config/opencode/opencode.json or .opencode/opencode.json
 {
   "plugin": ["opencode-notifier"]
 }
@@ -20,18 +14,19 @@ Add the plugin to your OpenCode config:
 
 Restart OpenCode. The plugin will be automatically downloaded and activated.
 
-## Configuration (Optional)
+## Configuration
 
-Create `~/.config/opencode/opencode-notifier.json` to customize behavior:
+To customize the plugin, create `~/.config/opencode/opencode-notifier.json`:
 
 ```json
 {
   "sound": true,
   "notification": true,
+  "timeout": 5,
   "events": {
-    "permission": true,
-    "complete": true,
-    "error": true
+    "permission": { "sound": true, "notification": true },
+    "complete": { "sound": true, "notification": true },
+    "error": { "sound": true, "notification": true }
   },
   "messages": {
     "permission": "OpenCode needs permission",
@@ -39,9 +34,9 @@ Create `~/.config/opencode/opencode-notifier.json` to customize behavior:
     "error": "OpenCode encountered an error"
   },
   "sounds": {
-    "permission": "/path/to/custom/permission.wav",
-    "complete": "/path/to/custom/complete.wav",
-    "error": "/path/to/custom/error.wav"
+    "permission": "/path/to/custom/sound.wav",
+    "complete": "/path/to/custom/sound.wav",
+    "error": "/path/to/custom/sound.wav"
   }
 }
 ```
@@ -50,70 +45,53 @@ Create `~/.config/opencode/opencode-notifier.json` to customize behavior:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `sound` | boolean | `true` | Enable/disable all sounds |
-| `notification` | boolean | `true` | Enable/disable all notifications |
-| `events.permission` | boolean | `true` | Enable/disable permission alerts |
-| `events.complete` | boolean | `true` | Enable/disable completion alerts |
-| `events.error` | boolean | `true` | Enable/disable error alerts |
-| `messages.permission` | string | "OpenCode needs permission" | Custom permission message |
-| `messages.complete` | string | "OpenCode has finished" | Custom completion message |
-| `messages.error` | string | "OpenCode encountered an error" | Custom error message |
-| `sounds.permission` | string | (bundled) | Custom sound file path |
-| `sounds.complete` | string | (bundled) | Custom sound file path |
-| `sounds.error` | string | (bundled) | Custom sound file path |
+| `sound` | boolean | `true` | Global toggle for all sounds |
+| `notification` | boolean | `true` | Global toggle for all notifications |
+| `timeout` | number | `5` | Notification duration in seconds (Linux only) |
 
-### Examples
+### Events
 
-**Notifications only (no sound):**
+Control sound and notification separately for each event:
+
 ```json
 {
-  "sound": false,
-  "notification": true
+  "events": {
+    "permission": { "sound": true, "notification": true },
+    "complete": { "sound": false, "notification": true },
+    "error": { "sound": true, "notification": false }
+  }
 }
 ```
 
-**Sound only (no notifications):**
-```json
-{
-  "sound": true,
-  "notification": false
-}
-```
+Or use a boolean to toggle both:
 
-**Only permission alerts:**
 ```json
 {
   "events": {
     "permission": true,
     "complete": false,
-    "error": false
+    "error": true
   }
 }
 ```
 
-## Platform Requirements
+### Messages
 
-### macOS
-- Notifications: Works out of the box (Notification Center)
-- Sound: Works out of the box (`afplay`)
+Customize notification text:
 
-### Linux
-- Notifications: Requires `libnotify` (`notify-send` command)
-  - Pre-installed on Ubuntu, Fedora, and most desktop distros
-  - Install: `sudo apt install libnotify-bin` (Debian/Ubuntu)
-- Sound: Requires one of:
-  - `paplay` (PulseAudio) - most common
-  - `aplay` (ALSA)
-  - `mpv`
-  - `ffplay` (FFmpeg)
+```json
+{
+  "messages": {
+    "permission": "Action required",
+    "complete": "Done!",
+    "error": "Something went wrong"
+  }
+}
+```
 
-### Windows
-- Notifications: Works out of the box (Toast notifications, Windows 8+)
-- Sound: Works out of the box (PowerShell)
+### Custom Sounds
 
-## Custom Sounds
-
-To use custom sounds, add WAV files and reference them in your config:
+Use your own sound files:
 
 ```json
 {
@@ -124,6 +102,8 @@ To use custom sounds, add WAV files and reference them in your config:
   }
 }
 ```
+
+If a custom sound file path is provided but the file doesn't exist, the plugin will fall back to the bundled sound.
 
 ## License
 
