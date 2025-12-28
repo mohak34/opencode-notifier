@@ -31,12 +31,12 @@ export interface NotifierConfig {
 }
 
 const DEFAULT_EVENT_CONFIG: EventConfig = {
-  sound: true,
+  sound: false,
   notification: true,
 }
 
 const DEFAULT_CONFIG: NotifierConfig = {
-  sound: true,
+  sound: false,
   notification: true,
   timeout: 5,
   events: {
@@ -108,9 +108,9 @@ export function loadConfig(): NotifierConfig {
           ? userConfig.timeout
           : DEFAULT_CONFIG.timeout,
       events: {
-        permission: parseEventConfig(userConfig.events?.permission, defaultWithGlobal),
-        complete: parseEventConfig(userConfig.events?.complete, defaultWithGlobal),
-        error: parseEventConfig(userConfig.events?.error, defaultWithGlobal),
+        permission: parseEventConfig(userConfig.events?.permission ?? userConfig.permission, defaultWithGlobal),
+        complete: parseEventConfig(userConfig.events?.complete ?? userConfig.complete, defaultWithGlobal),
+        error: parseEventConfig(userConfig.events?.error ?? userConfig.error, defaultWithGlobal),
       },
       messages: {
         permission: userConfig.messages?.permission ?? DEFAULT_CONFIG.messages.permission,
