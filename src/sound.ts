@@ -11,7 +11,20 @@ const DEBOUNCE_MS = 1000
 const lastSoundTime: Record<string, number> = {}
 
 function getBundledSoundPath(event: EventType): string {
-  return join(__dirname, "..", "sounds", `${event}.wav`)
+  const soundFilename = `${event}.wav`
+
+  const possiblePaths = [
+    join(__dirname, "..", "sounds", soundFilename),
+    join(__dirname, "sounds", soundFilename),
+  ]
+
+  for (const path of possiblePaths) {
+    if (existsSync(path)) {
+      return path
+    }
+  }
+
+  return join(__dirname, "..", "sounds", soundFilename)
 }
 
 function getSoundFilePath(event: EventType, customPath: string | null): string | null {
