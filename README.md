@@ -124,6 +124,35 @@ Use your own sound files:
 
 If a custom sound file path is provided but the file doesn't exist, the plugin will fall back to the bundled sound.
 
+## Debugging
+
+To enable debug logging and see which events are being received:
+
+```bash
+export OPENCODE_NOTIFIER_DEBUG=true
+opencode
+```
+
+This will log all events to the console, helping troubleshoot notification issues.
+
+## Technical Notes
+
+### Event System Migration (v0.1.8+)
+
+Version 0.1.8 migrates to OpenCode's new event system:
+
+| Event Type | Old Event (deprecated) | New Event (v0.1.8+) |
+|------------|------------------------|---------------------|
+| Permission requests | `permission.updated` | `permission.asked` |
+| Session completion | `session.idle` | `session.status` (with `type: "idle"`) |
+| Errors | `session.error` | `session.error` (unchanged) |
+
+**Why this matters**: The old events (`permission.updated`, `session.idle`) are deprecated in OpenCode core and may not fire reliably. If you're experiencing notification issues, ensure you're using v0.1.8 or later.
+
+**Source verification**: Event structure documented from OpenCode core:
+- `permission.asked`: `packages/opencode/src/permission/next.ts`
+- `session.status`: `packages/opencode/src/session/status.ts`
+
 ## License
 
 MIT
