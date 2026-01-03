@@ -66,6 +66,7 @@ export async function createNotifierPlugin(config?: NotifierConfig) {
   const pluginConfig = config ?? loadConfig()
   let lastErrorTime = -1
   let lastIdleTime = -1
+  let pendingIdleNotification: (() => void) | null = null // Cancellation handle for idle notification
   const DEBOUNCE_MS = 150 // Debounce window for error/idle race conditions (cancellation/errors happen quickly)
 
   logEvent({
@@ -115,11 +116,23 @@ export async function createNotifierPlugin(config?: NotifierConfig) {
           // Record idle time FIRST for potential future error debouncing
           lastIdleTime = now
           
-          // Delay idle notification slightly to detect cancellation (error coming right after)
-          // If error arrives within 50ms, it will set lastErrorTime and we skip the notification
+          // Delay idle notification to detect cancellation (error coming right after)
+          let cancelled = false
+          pendingIdleNotification = () => { cancelled = true }
+          
           await new Promise(resolve => setTimeout(resolve, 50))
           
-          // Check again if error happened while we were waiting
+          // Check if error cancelled this notification
+          if (cancelled) {
+            logEvent({
+              action: "skipIdleAfterError",
+              reason: "Idle notification cancelled - error detected during delay (cancellation)"
+            })
+            pendingIdleNotification = null
+            return
+          }
+          
+          // Check if error happened while we were waiting
           const afterDelay = timeProvider.now()
           if (lastErrorTime >= 0 && afterDelay - lastErrorTime < DEBOUNCE_MS) {
             logEvent({
@@ -127,9 +140,11 @@ export async function createNotifierPlugin(config?: NotifierConfig) {
               timeSinceError: afterDelay - lastErrorTime,
               reason: "Idle notification cancelled - error detected during delay (cancellation)"
             })
+            pendingIdleNotification = null
             return
           }
           
+          pendingIdleNotification = null
           await handleEvent(pluginConfig, "complete")
         }
       }
@@ -138,7 +153,19 @@ export async function createNotifierPlugin(config?: NotifierConfig) {
       if (event.type === "session.error") {
         const now = timeProvider.now()
         
-        // Skip error if idle just happened (idle came first - cancellation scenario)
+        // Cancel pending idle notification if one is waiting
+        if (pendingIdleNotification) {
+          logEvent({
+            action: "cancelPendingIdle",
+            reason: "Error occurred while idle notification was pending (cancellation)"
+          })
+          pendingIdleNotification()
+          pendingIdleNotification = null
+          // Don't send error notification either - it's a cancellation
+          return
+        }
+        
+        // Skip error if idle just happened (idle came first but already sent notification)
         if (lastIdleTime >= 0 && now - lastIdleTime < DEBOUNCE_MS) {
           logEvent({
             action: "skipErrorAfterIdle",
