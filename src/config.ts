@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "fs"
 import { join } from "path"
 import { homedir } from "os"
+import { parse as parseJsonc } from "jsonc-parser"
 import { logEvent } from "./debug-logging"
 
 export type EventType = "permission" | "complete" | "error"
@@ -109,7 +110,28 @@ export function loadConfig(): NotifierConfig {
       rawFileContent: fileContent
     })
     
-    const userConfig = JSON.parse(fileContent)
+    // Use jsonc-parser to support comments and trailing commas
+    const parsedData = parseJsonc(fileContent)
+    
+    logEvent({
+      action: "loadConfig",
+      step: "jsonParsed",
+      parsedData,
+      parsedType: typeof parsedData,
+      isArray: Array.isArray(parsedData)
+    })
+    
+    // Type guard: ensure we got an object
+    if (!parsedData || typeof parsedData !== "object" || Array.isArray(parsedData)) {
+      logEvent({
+        action: "loadConfig",
+        result: "parseError",
+        error: "Parsed config is not a valid object"
+      })
+      return DEFAULT_CONFIG
+    }
+
+    const userConfig = parsedData as Record<string, unknown>
 
     const globalSound = userConfig.sound ?? DEFAULT_CONFIG.sound
     const globalNotification = userConfig.notification ?? DEFAULT_CONFIG.notification

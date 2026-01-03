@@ -32,6 +32,7 @@
     "alerts"
   ],
   "dependencies": {
+    "jsonc-parser": "^3.3.1",
     "node-notifier": "^10.0.1"
   },
   "devDependencies": {
