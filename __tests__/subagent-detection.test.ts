@@ -1,6 +1,8 @@
-import { createNotifierPlugin, timeProvider } from '../src/plugin';
-import type { NotifierConfig } from '../src/config';
 import type { PluginInput } from '@opencode-ai/plugin';
+
+import type { NotifierConfig } from '../src/config';
+import type { EventWithProperties } from '../src/plugin';
+import { createNotifierPlugin, timeProvider } from '../src/plugin';
 
 // Mock dependencies
 jest.mock('../src/notify', () => ({
@@ -98,7 +100,7 @@ describe('Subagent Session Detection', () => {
           status: { type: 'idle' },
         },
       },
-    } as any);
+    } as EventWithProperties);
 
     // Should use "complete" message for main session
     expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null);
@@ -130,7 +132,7 @@ describe('Subagent Session Detection', () => {
           status: { type: 'idle' },
         },
       },
-    } as any);
+    } as EventWithProperties);
 
     // Should use "subagent" message for delegated task
     expect(sendNotification).toHaveBeenCalledWith('Subagent task complete', 5, null);
@@ -170,7 +172,7 @@ describe('Subagent Session Detection', () => {
           status: { type: 'idle' },
         },
       },
-    } as any);
+    } as EventWithProperties);
 
     // Should NOT send any notification (both disabled)
     expect(sendNotification).not.toHaveBeenCalled();
@@ -197,7 +199,7 @@ describe('Subagent Session Detection', () => {
           status: { type: 'idle' },
         },
       },
-    } as any);
+    } as EventWithProperties);
 
     // Should fallback to "complete" when session lookup fails
     expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null);
@@ -217,7 +219,7 @@ describe('Subagent Session Detection', () => {
           status: { type: 'idle' },
         },
       },
-    } as any);
+    } as EventWithProperties);
 
     // Should use "complete" as default when can't check
     expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null);
@@ -252,7 +254,7 @@ describe('Subagent Session Detection', () => {
           status: { type: 'idle' },
         },
       },
-    } as any);
+    } as EventWithProperties);
 
     expect(sendNotification).toHaveBeenNthCalledWith(1, 'Subagent task complete', 5, null);
     expect(playSound).toHaveBeenNthCalledWith(1, 'subagent', null, 0.5);
@@ -269,7 +271,7 @@ describe('Subagent Session Detection', () => {
           status: { type: 'idle' },
         },
       },
-    } as any);
+    } as EventWithProperties);
 
     expect(sendNotification).toHaveBeenNthCalledWith(1, 'Subagent task complete', 5, null);
     expect(playSound).toHaveBeenNthCalledWith(1, 'subagent', null, 0.5);
