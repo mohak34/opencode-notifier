@@ -20,7 +20,7 @@
     "sounds"
   ],
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node",
+    "build": "bun build src/index.ts --outdir dist --target node --external jsonc-parser --external node-notifier",
     "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit"
   },
