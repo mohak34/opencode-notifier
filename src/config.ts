@@ -1,6 +1,22 @@
-import { readFileSync, existsSync } from "fs"
+import { readFileSync, existsSync, appendFileSync } from "fs"
 import { join } from "path"
 import { homedir } from "os"
+
+const DEBUG = process.env.OPENCODE_NOTIFIER_DEBUG === "true"
+const LOG_FILE = join(process.cwd(), ".opencode_notifier_logs.jsonl")
+
+function logConfigEvent(data: any): void {
+  if (!DEBUG) return
+  try {
+    appendFileSync(LOG_FILE, JSON.stringify({
+      timestamp: new Date().toISOString(),
+      action: "loadConfig",
+      ...data
+    }) + "\n")
+  } catch {
+    // Silently fail if logging fails
+  }
+}
 
 export type EventType = "permission" | "complete" | "error"
 
@@ -84,12 +100,27 @@ function parseEventConfig(
 export function loadConfig(): NotifierConfig {
   const configPath = getConfigPath()
 
+  logConfigEvent({
+    configPath,
+    exists: existsSync(configPath)
+  })
+
   if (!existsSync(configPath)) {
+    logConfigEvent({
+      result: "usingDefaultConfig",
+      reason: "configFileNotFound"
+    })
     return DEFAULT_CONFIG
   }
 
   try {
     const fileContent = readFileSync(configPath, "utf-8")
+    
+    logConfigEvent({
+      step: "fileRead",
+      rawFileContent: fileContent
+    })
+    
     const userConfig = JSON.parse(fileContent)
 
     const globalSound = userConfig.sound ?? DEFAULT_CONFIG.sound
@@ -100,7 +131,7 @@ export function loadConfig(): NotifierConfig {
       notification: globalNotification,
     }
 
-    return {
+    const finalConfig = {
       sound: globalSound,
       notification: globalNotification,
       timeout:
@@ -123,7 +154,19 @@ export function loadConfig(): NotifierConfig {
         error: userConfig.sounds?.error ?? DEFAULT_CONFIG.sounds.error,
       },
     }
-  } catch {
+
+    logConfigEvent({
+      result: "parsedUserConfig",
+      parsedUserConfig: userConfig,
+      finalConfig: finalConfig
+    })
+
+    return finalConfig
+  } catch (err) {
+    logConfigEvent({
+      result: "parseError",
+      error: String(err)
+    })
     return DEFAULT_CONFIG
   }
 }
