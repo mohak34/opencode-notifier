@@ -44,7 +44,7 @@ export async function sendNotification(
 
     if (platform === "Darwin") {
       notificationOptions.sound = false
-      // On macOS, use contentImage for the main notification image
+      // On macOS, contentImage shows as preview on the right (can't replace Terminal icon without forking terminal-notifier)
       if (imagePath) {
         notificationOptions.contentImage = imagePath
       }
