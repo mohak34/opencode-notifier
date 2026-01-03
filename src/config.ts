@@ -4,7 +4,7 @@ import { homedir } from "os"
 import { parseJSONC } from "confbox"
 import { logEvent } from "./debug-logging"
 
-export type EventType = "permission" | "complete" | "error"
+export type EventType = "permission" | "complete" | "error" | "subagent"
 
 export interface EventConfig {
   sound: boolean
@@ -20,21 +20,25 @@ export interface NotifierConfig {
     permission: EventConfig
     complete: EventConfig
     error: EventConfig
+    subagent: EventConfig
   }
   messages: {
     permission: string
     complete: string
     error: string
+    subagent: string
   }
   sounds: {
     permission: string | null
     complete: string | null
     error: string | null
+    subagent: string | null
   }
   images: {
     permission: string | null
     complete: string | null
     error: string | null
+    subagent: string | null
   }
 }
 
@@ -52,21 +56,25 @@ const DEFAULT_CONFIG: NotifierConfig = {
     permission: { ...DEFAULT_EVENT_CONFIG },
     complete: { ...DEFAULT_EVENT_CONFIG },
     error: { ...DEFAULT_EVENT_CONFIG },
+    subagent: { sound: false, notification: false }, // Disabled by default
   },
   messages: {
     permission: "OpenCode needs permission",
     complete: "OpenCode has finished",
     error: "OpenCode encountered an error",
+    subagent: "Subagent task completed",
   },
   sounds: {
     permission: null,
     complete: null,
     error: null,
+    subagent: null,
   },
   images: {
     permission: null,
     complete: null,
     error: null,
+    subagent: null,
   },
 }
 

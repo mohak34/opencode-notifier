@@ -1,4 +1,5 @@
 // Plugin implementation - all exports here are for testing only
+import type { PluginInput } from "@opencode-ai/plugin"
 import { loadConfig, isEventSoundEnabled, isEventNotificationEnabled, getMessage, getSoundPath, getVolume, getImagePath } from "./config"
 import type { EventType, NotifierConfig } from "./config"
 import { sendNotification } from "./notify"
@@ -62,7 +63,7 @@ async function handleEvent(
 }
 
 // Exported for testing - allows config injection
-export async function createNotifierPlugin(config?: NotifierConfig) {
+export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?: PluginInput) {
   const pluginConfig = config ?? loadConfig()
   let lastErrorTime = -1
   let lastIdleTime = -1
@@ -113,6 +114,37 @@ export async function createNotifierPlugin(config?: NotifierConfig) {
             return
           }
           
+          // Determine event type: subagent or complete
+          let eventType: EventType = "complete"
+          
+          // Check if this is a subagent session completion
+          if (pluginInput) {
+            try {
+              const sessionID = (typedEvent.properties as any)?.sessionID
+              if (sessionID) {
+                const sessionResponse = await pluginInput.client.session.get(sessionID)
+                const session = sessionResponse.data
+                
+                // Use 'subagent' event type if it has a parent session
+                if (session?.parentID) {
+                  eventType = "subagent"
+                  logEvent({
+                    action: "subagentCompletion",
+                    sessionID,
+                    parentID: session.parentID,
+                    reason: "Subagent session completed - using 'subagent' event config"
+                  })
+                }
+              }
+            } catch (error) {
+              logEvent({
+                action: "sessionLookupError",
+                error: error instanceof Error ? error.message : String(error),
+                reason: "Failed to check if session is subagent - using 'complete' event config"
+              })
+            }
+          }
+          
           // Record idle time FIRST for potential future error debouncing
           lastIdleTime = now
           
@@ -145,7 +177,7 @@ export async function createNotifierPlugin(config?: NotifierConfig) {
           }
           
           pendingIdleNotification = null
-          await handleEvent(pluginConfig, "complete")
+          await handleEvent(pluginConfig, eventType)
         }
       }
 
@@ -183,6 +215,6 @@ export async function createNotifierPlugin(config?: NotifierConfig) {
 }
 
 // Main plugin factory - exported for tests, used by index.ts for production
-export async function createNotifierPluginInstance() {
-  return createNotifierPlugin()
+export async function createNotifierPluginInstance(pluginInput?: PluginInput) {
+  return createNotifierPlugin(undefined, pluginInput)
 }
