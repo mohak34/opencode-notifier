@@ -24,6 +24,12 @@ export interface EventWithProperties {
     status?: {
       type: string
     }
+    info?: {
+      id: string
+      title: string
+      parentID?: string
+    }
+    sessionID?: string
     [key: string]: unknown
   }
   [key: string]: unknown
@@ -31,7 +37,7 @@ export interface EventWithProperties {
 
 // Time provider for testing
 export const timeProvider = {
-  now: (): number => Date.now()
+  now: (): number => Date.now(),
 }
 
 async function handleEvent(
@@ -109,7 +115,7 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
 
       // Update cache on session lifecycle events
       if (event.type === "session.created" || event.type === "session.updated") {
-        const info = event.properties?.info as { id: string; title: string; parentID?: string } | undefined
+        const info = event.properties?.info
         if (info?.id && info?.title) {
           sessionCache.set(info.id, {
             title: info.title,
@@ -151,7 +157,7 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
                   variant: "warning",
                   duration: 3000,
                 },
-              }).catch(() => {}) // Ignore TUI errors
+              }).catch(() => {})
             }
           }
         }
@@ -185,6 +191,12 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
           // Use 'subagent' event type if it has a parent session
           if (parentID) {
             eventType = "subagent"
+            logEvent({
+              action: "subagentDetected",
+              sessionID,
+              parentID,
+              reason: "Session has a parentID, routing to subagent config",
+            })
           }
 
           // Record idle time FIRST for potential future error debouncing
@@ -196,7 +208,7 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
             cancelled = true
           }
 
-          await new Promise((resolve) => setTimeout(resolve, 50))
+          await new Promise((resolve) => setTimeout(resolve, 150))
 
           // Check if error cancelled this notification
           if (cancelled) {
