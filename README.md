@@ -37,6 +37,8 @@ The plugin works out of the box on all platforms. For best results:
 
 To customize the plugin, create `~/.config/opencode/opencode-notifier.json`:
 
+**Note**: The config file must be valid JSON (no comments allowed).
+
 ```json
 {
   "sound": true,
