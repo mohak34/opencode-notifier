@@ -133,7 +133,19 @@ export OPENCODE_NOTIFIER_DEBUG=true
 opencode
 ```
 
-This will log all events to the console, helping troubleshoot notification issues.
+This will create `opencode_notifier_logs.jsonl` in your current directory with detailed logs:
+- Plugin initialization with full config
+- Every event received
+- Each notification/sound triggered with config values
+
+**Example log output**:
+```jsonl
+{"timestamp":"2026-01-03T19:30:00.000Z","action":"pluginInit","configLoaded":true,"config":{"events":{"permission":{"sound":true,"notification":true},...}}}
+{"timestamp":"2026-01-03T19:30:05.000Z","action":"eventReceived","eventType":"session.status",...}
+{"timestamp":"2026-01-03T19:30:05.001Z","action":"handleEvent","eventType":"complete","message":"💛👁️ Without love, it cannot be seen.","customSoundPath":"/Users/ramarivera/.config/opencode/sounds/magic-butterflies.mp3",...}
+```
+
+**Note**: Logging only occurs when `OPENCODE_NOTIFIER_DEBUG=true`. No log file is created in normal use.
 
 ## Technical Notes
 
