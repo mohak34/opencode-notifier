@@ -122,8 +122,6 @@ export async function createNotifierPlugin(config?: NotifierConfig) {
   }
 }
 
-export const NotifierPlugin: Plugin = async () => {
-  return createNotifierPlugin()
-}
+export const NotifierPlugin: Plugin = createNotifierPlugin
 
 export default NotifierPlugin
