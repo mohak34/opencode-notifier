@@ -22,7 +22,10 @@
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target node",
     "prepublishOnly": "bun run build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "keywords": [
     "opencode",
@@ -37,8 +40,11 @@
   },
   "devDependencies": {
     "@opencode-ai/plugin": "^1.0.224",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.0.0",
     "@types/node-notifier": "^8.0.5",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
     "typescript": "^5.0.0"
   },
   "peerDependencies": {

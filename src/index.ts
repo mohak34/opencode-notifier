@@ -5,6 +5,23 @@ import { sendNotification } from "./notify"
 import { playSound } from "./sound"
 import { logEvent } from "./debug-logging"
 
+// Exported for testing
+export interface EventWithProperties {
+  type: string
+  properties?: {
+    status?: {
+      type: string
+    }
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+// Time provider for testing
+export const timeProvider = {
+  now: (): number => Date.now()
+}
+
 async function handleEvent(
   config: NotifierConfig,
   eventType: EventType
@@ -44,8 +61,9 @@ async function handleEvent(
   await Promise.allSettled(promises)
 }
 
-export const NotifierPlugin: Plugin = async () => {
-  const config = loadConfig()
+// Exported for testing - allows config injection
+export async function createNotifierPlugin(config?: NotifierConfig) {
+  const pluginConfig = config ?? loadConfig()
   let lastErrorTime = 0
   const ERROR_IDLE_DEBOUNCE_MS = 2000 // Skip idle events within 2s of error
 
@@ -53,13 +71,13 @@ export const NotifierPlugin: Plugin = async () => {
     action: "pluginInit",
     configLoaded: true,
     config: {
-      sound: config.sound,
-      notification: config.notification,
-      timeout: config.timeout,
-      volume: config.volume,
-      events: config.events,
-      messages: config.messages,
-      sounds: config.sounds
+      sound: pluginConfig.sound,
+      notification: pluginConfig.notification,
+      timeout: pluginConfig.timeout,
+      volume: pluginConfig.volume,
+      events: pluginConfig.events,
+      messages: pluginConfig.messages,
+      sounds: pluginConfig.sounds
     }
   })
 
@@ -73,15 +91,16 @@ export const NotifierPlugin: Plugin = async () => {
 
       // NEW: permission.asked replaces deprecated permission.updated
       if (event.type === "permission.asked") {
-        await handleEvent(config, "permission")
+        await handleEvent(pluginConfig, "permission")
       }
 
       // NEW: session.status replaces deprecated session.idle
       if (event.type === "session.status") {
-        const status = (event as any).properties?.status
+        const typedEvent = event as EventWithProperties
+        const status = typedEvent.properties?.status
         if (status?.type === "idle") {
           // Skip idle if it's right after an error
-          const now = Date.now()
+          const now = timeProvider.now()
           if (now - lastErrorTime < ERROR_IDLE_DEBOUNCE_MS) {
             logEvent({
               action: "skipIdleAfterError",
@@ -90,17 +109,21 @@ export const NotifierPlugin: Plugin = async () => {
             })
             return
           }
-          await handleEvent(config, "complete")
+          await handleEvent(pluginConfig, "complete")
         }
       }
 
       // UNCHANGED: session.error still valid
       if (event.type === "session.error") {
-        lastErrorTime = Date.now()
-        await handleEvent(config, "error")
+        lastErrorTime = timeProvider.now()
+        await handleEvent(pluginConfig, "error")
       }
     },
   }
+}
+
+export const NotifierPlugin: Plugin = async () => {
+  return createNotifierPlugin()
 }
 
 export default NotifierPlugin
