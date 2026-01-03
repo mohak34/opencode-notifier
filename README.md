@@ -35,9 +35,7 @@ The plugin works out of the box on all platforms. For best results:
 
 ## Configuration
 
-To customize the plugin, create `~/.config/opencode/opencode-notifier.json`:
-
-**Note**: The config file must be valid JSON (no comments allowed).
+To customize the plugin, create `~/.config/opencode/opencode-notifier.json`. The file supports standard JSON and JSON with comments (JSONC).
 
 ```json
 {
@@ -144,7 +142,7 @@ This will create `.opencode_notifier_logs.jsonl` in your current directory with 
 ```jsonl
 {"timestamp":"2026-01-03T19:30:00.000Z","action":"pluginInit","configLoaded":true,"config":{"events":{"permission":{"sound":true,"notification":true},...}}}
 {"timestamp":"2026-01-03T19:30:05.000Z","action":"eventReceived","eventType":"session.status",...}
-{"timestamp":"2026-01-03T19:30:05.001Z","action":"handleEvent","eventType":"complete","message":"💛👁️ Without love, it cannot be seen.","customSoundPath":"/Users/ramarivera/.config/opencode/sounds/magic-butterflies.mp3",...}
+{"timestamp":"2026-01-03T19:30:05.001Z","action":"handleEvent","eventType":"complete","message":"OpenCode has finished","sessionTitle":"My Project",...}
 ```
 
 **Note**: Logging only occurs when `OPENCODE_NOTIFIER_DEBUG=true`. No log file is created in normal use.

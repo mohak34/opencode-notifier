@@ -14,7 +14,6 @@ export function logEvent(data: unknown): void {
     })
     appendFileSync(LOG_FILE, `${logEntry}\n`)
   } catch {
-    // Silently fail if logging fails
   }
 }
 

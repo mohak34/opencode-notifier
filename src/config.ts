@@ -108,6 +108,8 @@ function parseEventConfig(
   }
 }
 
+type UserEventConfig = boolean | { sound?: boolean; notification?: boolean }
+
 export function loadConfig(): NotifierConfig {
   const configPath = getConfigPath()
 
@@ -128,30 +130,13 @@ export function loadConfig(): NotifierConfig {
 
   try {
     const fileContent = readFileSync(configPath, "utf-8")
-    
-    logEvent({
-      action: "loadConfig",
-      step: "fileRead",
-      rawFileContent: fileContent
-    })
-
-    // Use confbox to support comments and trailing commas
     const parsedData = parseJSONC(fileContent)
 
-    logEvent({
-      action: "loadConfig",
-      step: "jsonParsed",
-      parsedData,
-      parsedType: typeof parsedData,
-      isArray: Array.isArray(parsedData)
-    })
-    
-    // Type guard: ensure we got an object
     if (!parsedData || typeof parsedData !== "object" || Array.isArray(parsedData)) {
       logEvent({
         action: "loadConfig",
         result: "parseError",
-        error: "Parsed config is not a valid object"
+        error: "Invalid config object"
       })
       return DEFAULT_CONFIG
     }
@@ -166,12 +151,12 @@ export function loadConfig(): NotifierConfig {
       notification: globalNotification,
     }
 
-    const events = (userConfig.events as Record<string, boolean | { sound?: boolean; notification?: boolean }> | undefined) ?? {}
+    const events = (userConfig.events as Record<string, UserEventConfig> | undefined) ?? {}
     const messages = (userConfig.messages as Record<string, string> | undefined) ?? {}
     const sounds = (userConfig.sounds as Record<string, string | null> | undefined) ?? {}
     const images = (userConfig.images as Record<string, string | null> | undefined) ?? {}
 
-    const finalConfig: NotifierConfig = {
+    return {
       sound: globalSound,
       notification: globalNotification,
       timeout:
@@ -183,32 +168,30 @@ export function loadConfig(): NotifierConfig {
           ? userConfig.volume
           : DEFAULT_CONFIG.volume,
       events: {
-        permission: parseEventConfig(events.permission ?? (userConfig.permission as boolean | { sound?: boolean; notification?: boolean } | undefined), defaultWithGlobal),
-        complete: parseEventConfig(events.complete ?? (userConfig.complete as boolean | { sound?: boolean; notification?: boolean } | undefined), defaultWithGlobal),
-        error: parseEventConfig(events.error ?? (userConfig.error as boolean | { sound?: boolean; notification?: boolean } | undefined), defaultWithGlobal),
-        subagent: parseEventConfig(events.subagent ?? (userConfig.subagent as boolean | { sound?: boolean; notification?: boolean } | undefined), DEFAULT_CONFIG.events.subagent),
+        permission: parseEventConfig(events.permission ?? (userConfig.permission as UserEventConfig | undefined), defaultWithGlobal),
+        complete: parseEventConfig(events.complete ?? (userConfig.complete as UserEventConfig | undefined), defaultWithGlobal),
+        error: parseEventConfig(events.error ?? (userConfig.error as UserEventConfig | undefined), defaultWithGlobal),
+        subagent: parseEventConfig(events.subagent ?? (userConfig.subagent as UserEventConfig | undefined), DEFAULT_CONFIG.events.subagent),
       },
       messages: {
-        permission: messages.permission ?? (userConfig.permission as string | undefined) ?? DEFAULT_CONFIG.messages.permission,
-        complete: messages.complete ?? (userConfig.complete as string | undefined) ?? DEFAULT_CONFIG.messages.complete,
-        error: messages.error ?? (userConfig.error as string | undefined) ?? DEFAULT_CONFIG.messages.error,
-        subagent: messages.subagent ?? (userConfig.subagent as string | undefined) ?? DEFAULT_CONFIG.messages.subagent,
+        permission: messages.permission ?? (typeof userConfig.permission === "string" ? userConfig.permission : undefined) ?? DEFAULT_CONFIG.messages.permission,
+        complete: messages.complete ?? (typeof userConfig.complete === "string" ? userConfig.complete : undefined) ?? DEFAULT_CONFIG.messages.complete,
+        error: messages.error ?? (typeof userConfig.error === "string" ? userConfig.error : undefined) ?? DEFAULT_CONFIG.messages.error,
+        subagent: messages.subagent ?? (typeof userConfig.subagent === "string" ? userConfig.subagent : undefined) ?? DEFAULT_CONFIG.messages.subagent,
       },
       sounds: {
-        permission: sounds.permission ?? (userConfig.permission as string | null | undefined) ?? DEFAULT_CONFIG.sounds.permission,
-        complete: sounds.complete ?? (userConfig.complete as string | null | undefined) ?? DEFAULT_CONFIG.sounds.complete,
-        error: sounds.error ?? (userConfig.error as string | null | undefined) ?? DEFAULT_CONFIG.sounds.error,
-        subagent: sounds.subagent ?? (userConfig.subagent as string | null | undefined) ?? DEFAULT_CONFIG.sounds.subagent,
+        permission: sounds.permission ?? (typeof userConfig.permission === "string" ? userConfig.permission : null) ?? DEFAULT_CONFIG.sounds.permission,
+        complete: sounds.complete ?? (typeof userConfig.complete === "string" ? userConfig.complete : null) ?? DEFAULT_CONFIG.sounds.complete,
+        error: sounds.error ?? (typeof userConfig.error === "string" ? userConfig.error : null) ?? DEFAULT_CONFIG.sounds.error,
+        subagent: sounds.subagent ?? (typeof userConfig.subagent === "string" ? userConfig.subagent : null) ?? DEFAULT_CONFIG.sounds.subagent,
       },
       images: {
-        permission: images.permission ?? (userConfig.permission as string | null | undefined) ?? DEFAULT_CONFIG.images.permission,
-        complete: images.complete ?? (userConfig.complete as string | null | undefined) ?? DEFAULT_CONFIG.images.complete,
-        error: images.error ?? (userConfig.error as string | null | undefined) ?? DEFAULT_CONFIG.images.error,
-        subagent: images.subagent ?? (userConfig.subagent as string | null | undefined) ?? DEFAULT_CONFIG.images.subagent,
+        permission: images.permission ?? (typeof userConfig.permission === "string" ? userConfig.permission : null) ?? DEFAULT_CONFIG.images.permission,
+        complete: images.complete ?? (typeof userConfig.complete === "string" ? userConfig.complete : null) ?? DEFAULT_CONFIG.images.complete,
+        error: images.error ?? (typeof userConfig.error === "string" ? userConfig.error : null) ?? DEFAULT_CONFIG.images.error,
+        subagent: images.subagent ?? (typeof userConfig.subagent === "string" ? userConfig.subagent : null) ?? DEFAULT_CONFIG.images.subagent,
       },
     }
-
-    return finalConfig
   } catch (err) {
     return DEFAULT_CONFIG
   }

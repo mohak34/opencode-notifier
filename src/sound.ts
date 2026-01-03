@@ -10,8 +10,7 @@ import type { EventType } from "./config"
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const lastSoundTime: Record<string, number> = {}
-
-
+ 
 function getBundledSoundPath(event: EventType): string {
   return join(__dirname, "..", "sounds", `${event}.wav`)
 }

@@ -8,14 +8,18 @@ const NOTIFICATION_TITLE = "OpenCode"
 
 const platform = os.type()
 
-let platformNotifier: typeof notifier
+type NotifierInstance = {
+  notify(options?: notifier.Notification, callback?: notifier.NotificationCallback): NotifierInstance
+}
+
+let platformNotifier: NotifierInstance
 
 if (platform === "Linux" || platform.match(/BSD$/)) {
-  platformNotifier = new notifier.NotifySend({ withFallback: false }) as unknown as typeof notifier
+  platformNotifier = new notifier.NotifySend({ withFallback: false })
 } else if (platform === "Darwin") {
-  platformNotifier = new notifier.NotificationCenter({ withFallback: false }) as unknown as typeof notifier
+  platformNotifier = new notifier.NotificationCenter({ withFallback: false })
 } else if (platform === "Windows_NT") {
-  platformNotifier = new notifier.WindowsToaster({ withFallback: false }) as unknown as typeof notifier
+  platformNotifier = new notifier.WindowsToaster({ withFallback: false })
 } else {
   platformNotifier = notifier
 }
