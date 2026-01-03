@@ -20,7 +20,7 @@
     "sounds"
   ],
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node --external jsonc-parser --external node-notifier",
+    "build": "bun build src/index.ts --outdir dist --target node",
     "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit"
   },
@@ -32,7 +32,7 @@
     "alerts"
   ],
   "dependencies": {
-    "jsonc-parser": "^3.3.1",
+    "confbox": "^0.2.2",
     "node-notifier": "^10.0.1"
   },
   "devDependencies": {

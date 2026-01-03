@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from "fs"
 import { join } from "path"
 import { homedir } from "os"
-import { parse as parseJsonc } from "jsonc-parser"
+import { parseJSONC } from "confbox"
 import { logEvent } from "./debug-logging"
 
 export type EventType = "permission" | "complete" | "error"
@@ -15,6 +15,7 @@ export interface NotifierConfig {
   sound: boolean
   notification: boolean
   timeout: number
+  volume: number
   events: {
     permission: EventConfig
     complete: EventConfig
@@ -41,6 +42,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
   sound: false,
   notification: true,
   timeout: 5,
+  volume: 1.0,
   events: {
     permission: { ...DEFAULT_EVENT_CONFIG },
     complete: { ...DEFAULT_EVENT_CONFIG },
@@ -110,8 +112,8 @@ export function loadConfig(): NotifierConfig {
       rawFileContent: fileContent
     })
     
-    // Use jsonc-parser to support comments and trailing commas
-    const parsedData = parseJsonc(fileContent)
+    // Use confbox to support comments and trailing commas
+    const parsedData = parseJSONC(fileContent)
     
     logEvent({
       action: "loadConfig",
@@ -148,6 +150,10 @@ export function loadConfig(): NotifierConfig {
         typeof userConfig.timeout === "number" && userConfig.timeout > 0
           ? userConfig.timeout
           : DEFAULT_CONFIG.timeout,
+      volume:
+        typeof userConfig.volume === "number" && userConfig.volume > 0 && userConfig.volume <= 1
+          ? userConfig.volume
+          : DEFAULT_CONFIG.volume,
       events: {
         permission: parseEventConfig(userConfig.events?.permission ?? userConfig.permission, defaultWithGlobal),
         complete: parseEventConfig(userConfig.events?.complete ?? userConfig.complete, defaultWithGlobal),
@@ -197,4 +203,8 @@ export function getMessage(config: NotifierConfig, event: EventType): string {
 
 export function getSoundPath(config: NotifierConfig, event: EventType): string | null {
   return config.sounds[event]
+}
+
+export function getVolume(config: NotifierConfig): number {
+  return config.volume
 }
