@@ -1,22 +1,21 @@
-import os from "os"
+import os from "node:os"
+
 import notifier from "node-notifier"
 
+import { DEBOUNCE_MS } from "./config"
+
 const NOTIFICATION_TITLE = "OpenCode"
-const DEBOUNCE_MS = 1000
 
 const platform = os.type()
 
-let platformNotifier: any
+let platformNotifier: typeof notifier
 
 if (platform === "Linux" || platform.match(/BSD$/)) {
-  const { NotifySend } = notifier
-  platformNotifier = new NotifySend({ withFallback: false })
+  platformNotifier = new notifier.NotifySend({ withFallback: false }) as unknown as typeof notifier
 } else if (platform === "Darwin") {
-  const { NotificationCenter } = notifier
-  platformNotifier = new NotificationCenter({ withFallback: false })
+  platformNotifier = new notifier.NotificationCenter({ withFallback: false }) as unknown as typeof notifier
 } else if (platform === "Windows_NT") {
-  const { WindowsToaster } = notifier
-  platformNotifier = new WindowsToaster({ withFallback: false })
+  platformNotifier = new notifier.WindowsToaster({ withFallback: false }) as unknown as typeof notifier
 } else {
   platformNotifier = notifier
 }
@@ -35,31 +34,25 @@ export async function sendNotification(
   lastNotificationTime[message] = now
 
   return new Promise((resolve) => {
-    const notificationOptions: any = {
+    const notificationOptions: Record<string, unknown> = {
       title: NOTIFICATION_TITLE,
       message: message,
       timeout: timeout,
-      icon: undefined,
     }
 
     if (platform === "Darwin") {
       notificationOptions.sound = false
-      // On macOS, contentImage shows as preview on the right (can't replace Terminal icon without forking terminal-notifier)
       if (imagePath) {
         notificationOptions.contentImage = imagePath
       }
     } else if (platform === "Windows_NT" || platform === "Linux" || platform.match(/BSD$/)) {
-      // On Windows and Linux, use icon for the notification image
       if (imagePath) {
         notificationOptions.icon = imagePath
       }
     }
 
-    platformNotifier.notify(
-      notificationOptions,
-      () => {
-        resolve()
-      }
-    )
+    platformNotifier.notify(notificationOptions as notifier.Notification, () => {
+      resolve()
+    })
   })
 }

@@ -1,14 +1,16 @@
-import { platform } from "os"
-import { join, dirname } from "path"
-import { fileURLToPath } from "url"
-import { existsSync } from "fs"
-import { spawn } from "child_process"
+import { spawn } from "node:child_process"
+import { existsSync } from "node:fs"
+import { platform } from "node:os"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+
+import { DEBOUNCE_MS } from "./config"
 import type { EventType } from "./config"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const DEBOUNCE_MS = 1000
 
 const lastSoundTime: Record<string, number> = {}
+
 
 function getBundledSoundPath(event: EventType): string {
   return join(__dirname, "..", "sounds", `${event}.wav`)

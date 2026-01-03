@@ -1,4 +1,5 @@
 import { createNotifierPlugin, timeProvider } from '../src/plugin';
+import type { EventWithProperties } from '../src/plugin';
 
 // Mock dependencies
 jest.mock('../src/notify', () => ({
@@ -7,10 +8,6 @@ jest.mock('../src/notify', () => ({
 
 jest.mock('../src/sound', () => ({
   playSound: jest.fn().mockResolvedValue(undefined),
-}));
-
-jest.mock('../src/debug-logging', () => ({
-  logEvent: jest.fn(),
 }));
 
 jest.mock('../src/config', () => ({
@@ -23,21 +20,25 @@ jest.mock('../src/config', () => ({
       permission: { sound: true, notification: true },
       complete: { sound: true, notification: false },
       error: { sound: false, notification: true },
+      subagent: { sound: false, notification: false },
     },
     messages: {
-      permission: '⚔️🔴「RED TRUTH」- Your action is required!',
-      complete: '💛👁️ Without love, it cannot be seen.',
-      error: '✨🦋 Beatrice: Perhaps a witch\'s mistake?',
+      permission: 'Action required',
+      complete: 'Done',
+      error: 'Error',
+      subagent: 'Subagent done',
     },
     sounds: {
-      permission: '/path/to/red-truth.mp3',
-      complete: '/path/to/butterflies.mp3',
-      error: '/path/to/ahaha.mp3',
+      permission: '/path/to/permission.mp3',
+      complete: '/path/to/complete.mp3',
+      error: '/path/to/error.mp3',
+      subagent: '/path/to/subagent.mp3',
     },
     images: {
-      permission: '/path/to/swords.png',
-      complete: '/path/to/beatrice.png',
+      permission: '/path/to/permission.png',
+      complete: '/path/to/complete.png',
       error: '/path/to/error.jpg',
+      subagent: '/path/to/subagent.png',
     },
   }),
   isEventSoundEnabled: jest.fn((config, eventType) => config.events[eventType].sound),
@@ -46,6 +47,7 @@ jest.mock('../src/config', () => ({
   getSoundPath: jest.fn((config, eventType) => config.sounds[eventType]),
   getVolume: jest.fn().mockReturnValue(0.35),
   getImagePath: jest.fn((config, eventType) => config.images[eventType]),
+  RACE_CONDITION_DEBOUNCE_MS: 150,
 }));
 
 import { sendNotification } from '../src/notify';
@@ -69,33 +71,39 @@ describe('Notification Parameters', () => {
   it('should call sendNotification with correct message, timeout, and image for permission', async () => {
     const plugin = await createNotifierPlugin();
 
-    await plugin.event({
+    const eventPromise = plugin.event({
       event: {
         type: 'permission.asked',
         properties: {},
-      },
-    } as any);
+      } as EventWithProperties,
+    });
+
+    jest.runAllTimers();
+    await eventPromise;
 
     expect(sendNotification).toHaveBeenCalledWith(
-      '⚔️🔴「RED TRUTH」- Your action is required!',
+      'Action required',
       10,
-      '/path/to/swords.png'
+      '/path/to/permission.png'
     );
   });
 
   it('should call playSound with correct sound path and volume for permission', async () => {
     const plugin = await createNotifierPlugin();
 
-    await plugin.event({
+    const eventPromise = plugin.event({
       event: {
         type: 'permission.asked',
         properties: {},
-      },
-    } as any);
+      } as EventWithProperties,
+    });
+
+    jest.runAllTimers();
+    await eventPromise;
 
     expect(playSound).toHaveBeenCalledWith(
       'permission',
-      '/path/to/red-truth.mp3',
+      '/path/to/permission.mp3',
       0.35
     );
   });
@@ -103,15 +111,18 @@ describe('Notification Parameters', () => {
   it('should call sendNotification but not playSound when sound disabled', async () => {
     const plugin = await createNotifierPlugin();
 
-    await plugin.event({
+    const eventPromise = plugin.event({
       event: {
         type: 'session.error',
         properties: {},
-      },
-    } as any);
+      } as EventWithProperties,
+    });
+
+    jest.runAllTimers();
+    await eventPromise;
 
     expect(sendNotification).toHaveBeenCalledWith(
-      '✨🦋 Beatrice: Perhaps a witch\'s mistake?',
+      'Error',
       10,
       '/path/to/error.jpg'
     );
@@ -121,18 +132,21 @@ describe('Notification Parameters', () => {
   it('should call playSound but not sendNotification when notification disabled', async () => {
     const plugin = await createNotifierPlugin();
 
-    await plugin.event({
+    const eventPromise = plugin.event({
       event: {
         type: 'session.status',
         properties: {
           status: { type: 'idle' },
         },
-      },
-    } as any);
+      } as EventWithProperties,
+    });
+
+    jest.advanceTimersByTime(200);
+    await eventPromise;
 
     expect(playSound).toHaveBeenCalledWith(
       'complete',
-      '/path/to/butterflies.mp3',
+      '/path/to/complete.mp3',
       0.35
     );
     expect(sendNotification).not.toHaveBeenCalled();
@@ -143,20 +157,23 @@ describe('Notification Parameters', () => {
 
     // Permission
     mockNow = 0;
-    await plugin.event({
-      event: { type: 'permission.asked', properties: {} },
-    } as any);
+    const eventPromise1 = plugin.event({
+      event: { type: 'permission.asked', properties: {} } as EventWithProperties,
+    });
+
+    jest.runAllTimers();
+    await eventPromise1;
 
     expect(sendNotification).toHaveBeenNthCalledWith(
       1,
-      '⚔️🔴「RED TRUTH」- Your action is required!',
+      'Action required',
       10,
-      '/path/to/swords.png'
+      '/path/to/permission.png'
     );
     expect(playSound).toHaveBeenNthCalledWith(
       1,
       'permission',
-      '/path/to/red-truth.mp3',
+      '/path/to/permission.mp3',
       0.35
     );
 
@@ -164,16 +181,19 @@ describe('Notification Parameters', () => {
 
     // Complete (idle) - advance time to avoid debounce
     mockNow = 1000;
-    await plugin.event({
+    const eventPromise2 = plugin.event({
       event: {
         type: 'session.status',
         properties: { status: { type: 'idle' } },
-      },
-    } as any);
+      } as EventWithProperties,
+    });
+
+    jest.advanceTimersByTime(200);
+    await eventPromise2;
 
     expect(playSound).toHaveBeenCalledWith(
       'complete',
-      '/path/to/butterflies.mp3',
+      '/path/to/complete.mp3',
       0.35
     );
     expect(sendNotification).not.toHaveBeenCalled(); // notification disabled
@@ -182,12 +202,15 @@ describe('Notification Parameters', () => {
 
     // Error - advance time to avoid debounce
     mockNow = 2000;
-    await plugin.event({
-      event: { type: 'session.error', properties: {} },
-    } as any);
+    const eventPromise3 = plugin.event({
+      event: { type: 'session.error', properties: {} } as EventWithProperties,
+    });
+
+    jest.runAllTimers();
+    await eventPromise3;
 
     expect(sendNotification).toHaveBeenCalledWith(
-      '✨🦋 Beatrice: Perhaps a witch\'s mistake?',
+      'Error',
       10,
       '/path/to/error.jpg'
     );

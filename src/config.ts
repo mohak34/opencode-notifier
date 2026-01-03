@@ -1,10 +1,15 @@
-import { readFileSync, existsSync } from "fs"
-import { join } from "path"
-import { homedir } from "os"
+import { existsSync, readFileSync } from "node:fs"
+import { homedir } from "node:os"
+import { join } from "node:path"
+
 import { parseJSONC } from "confbox"
+
 import { logEvent } from "./debug-logging"
 
 export type EventType = "permission" | "complete" | "error" | "subagent"
+
+export const DEBOUNCE_MS = 1000
+export const RACE_CONDITION_DEBOUNCE_MS = 150
 
 export interface EventConfig {
   sound: boolean
@@ -129,10 +134,10 @@ export function loadConfig(): NotifierConfig {
       step: "fileRead",
       rawFileContent: fileContent
     })
-    
+
     // Use confbox to support comments and trailing commas
     const parsedData = parseJSONC(fileContent)
-    
+
     logEvent({
       action: "loadConfig",
       step: "jsonParsed",
@@ -153,15 +158,20 @@ export function loadConfig(): NotifierConfig {
 
     const userConfig = parsedData as Record<string, unknown>
 
-    const globalSound = userConfig.sound ?? DEFAULT_CONFIG.sound
-    const globalNotification = userConfig.notification ?? DEFAULT_CONFIG.notification
+    const globalSound = (userConfig.sound as boolean | undefined) ?? DEFAULT_CONFIG.sound
+    const globalNotification = (userConfig.notification as boolean | undefined) ?? DEFAULT_CONFIG.notification
 
     const defaultWithGlobal: EventConfig = {
       sound: globalSound,
       notification: globalNotification,
     }
 
-    const finalConfig = {
+    const events = (userConfig.events as Record<string, boolean | { sound?: boolean; notification?: boolean }> | undefined) ?? {}
+    const messages = (userConfig.messages as Record<string, string> | undefined) ?? {}
+    const sounds = (userConfig.sounds as Record<string, string | null> | undefined) ?? {}
+    const images = (userConfig.images as Record<string, string | null> | undefined) ?? {}
+
+    const finalConfig: NotifierConfig = {
       sound: globalSound,
       notification: globalNotification,
       timeout:
@@ -173,41 +183,33 @@ export function loadConfig(): NotifierConfig {
           ? userConfig.volume
           : DEFAULT_CONFIG.volume,
       events: {
-        permission: parseEventConfig(userConfig.events?.permission ?? userConfig.permission, defaultWithGlobal),
-        complete: parseEventConfig(userConfig.events?.complete ?? userConfig.complete, defaultWithGlobal),
-        error: parseEventConfig(userConfig.events?.error ?? userConfig.error, defaultWithGlobal),
+        permission: parseEventConfig(events.permission ?? (userConfig.permission as boolean | { sound?: boolean; notification?: boolean } | undefined), defaultWithGlobal),
+        complete: parseEventConfig(events.complete ?? (userConfig.complete as boolean | { sound?: boolean; notification?: boolean } | undefined), defaultWithGlobal),
+        error: parseEventConfig(events.error ?? (userConfig.error as boolean | { sound?: boolean; notification?: boolean } | undefined), defaultWithGlobal),
+        subagent: parseEventConfig(events.subagent ?? (userConfig.subagent as boolean | { sound?: boolean; notification?: boolean } | undefined), DEFAULT_CONFIG.events.subagent),
       },
       messages: {
-        permission: userConfig.messages?.permission ?? DEFAULT_CONFIG.messages.permission,
-        complete: userConfig.messages?.complete ?? DEFAULT_CONFIG.messages.complete,
-        error: userConfig.messages?.error ?? DEFAULT_CONFIG.messages.error,
+        permission: messages.permission ?? (userConfig.permission as string | undefined) ?? DEFAULT_CONFIG.messages.permission,
+        complete: messages.complete ?? (userConfig.complete as string | undefined) ?? DEFAULT_CONFIG.messages.complete,
+        error: messages.error ?? (userConfig.error as string | undefined) ?? DEFAULT_CONFIG.messages.error,
+        subagent: messages.subagent ?? (userConfig.subagent as string | undefined) ?? DEFAULT_CONFIG.messages.subagent,
       },
       sounds: {
-        permission: userConfig.sounds?.permission ?? DEFAULT_CONFIG.sounds.permission,
-        complete: userConfig.sounds?.complete ?? DEFAULT_CONFIG.sounds.complete,
-        error: userConfig.sounds?.error ?? DEFAULT_CONFIG.sounds.error,
+        permission: sounds.permission ?? (userConfig.permission as string | null | undefined) ?? DEFAULT_CONFIG.sounds.permission,
+        complete: sounds.complete ?? (userConfig.complete as string | null | undefined) ?? DEFAULT_CONFIG.sounds.complete,
+        error: sounds.error ?? (userConfig.error as string | null | undefined) ?? DEFAULT_CONFIG.sounds.error,
+        subagent: sounds.subagent ?? (userConfig.subagent as string | null | undefined) ?? DEFAULT_CONFIG.sounds.subagent,
       },
       images: {
-        permission: userConfig.images?.permission ?? DEFAULT_CONFIG.images.permission,
-        complete: userConfig.images?.complete ?? DEFAULT_CONFIG.images.complete,
-        error: userConfig.images?.error ?? DEFAULT_CONFIG.images.error,
+        permission: images.permission ?? (userConfig.permission as string | null | undefined) ?? DEFAULT_CONFIG.images.permission,
+        complete: images.complete ?? (userConfig.complete as string | null | undefined) ?? DEFAULT_CONFIG.images.complete,
+        error: images.error ?? (userConfig.error as string | null | undefined) ?? DEFAULT_CONFIG.images.error,
+        subagent: images.subagent ?? (userConfig.subagent as string | null | undefined) ?? DEFAULT_CONFIG.images.subagent,
       },
     }
 
-    logEvent({
-      action: "loadConfig",
-      result: "parsedUserConfig",
-      parsedUserConfig: userConfig,
-      finalConfig: finalConfig
-    })
-
     return finalConfig
   } catch (err) {
-    logEvent({
-      action: "loadConfig",
-      result: "parseError",
-      error: String(err)
-    })
     return DEFAULT_CONFIG
   }
 }

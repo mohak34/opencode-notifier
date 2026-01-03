@@ -1,10 +1,20 @@
 // Plugin implementation - all exports here are for testing only
 import type { PluginInput } from "@opencode-ai/plugin"
-import { loadConfig, isEventSoundEnabled, isEventNotificationEnabled, getMessage, getSoundPath, getVolume, getImagePath } from "./config"
+
+import { logEvent } from "./debug-logging"
+import {
+  getImagePath,
+  getMessage,
+  getSoundPath,
+  getVolume,
+  isEventNotificationEnabled,
+  isEventSoundEnabled,
+  loadConfig,
+  RACE_CONDITION_DEBOUNCE_MS,
+} from "./config"
 import type { EventType, NotifierConfig } from "./config"
 import { sendNotification } from "./notify"
 import { playSound } from "./sound"
-import { logEvent } from "./debug-logging"
 
 // Exported for testing
 export interface EventWithProperties {
@@ -47,8 +57,8 @@ async function handleEvent(
     config: {
       events: config.events,
       messages: config.messages,
-      sounds: config.sounds
-    }
+      sounds: config.sounds,
+    },
   })
 
   if (notificationEnabled) {
@@ -67,8 +77,6 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
   const pluginConfig = config ?? loadConfig()
   let lastErrorTime = -1
   let lastIdleTime = -1
-  let pendingIdleNotification: (() => void) | null = null // Cancellation handle for idle notification
-  const DEBOUNCE_MS = 150 // Debounce window for error/idle race conditions (cancellation/errors happen quickly)
 
   logEvent({
     action: "pluginInit",
@@ -80,16 +88,16 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
       volume: pluginConfig.volume,
       events: pluginConfig.events,
       messages: pluginConfig.messages,
-      sounds: pluginConfig.sounds
-    }
+      sounds: pluginConfig.sounds,
+    },
   })
 
   return {
-    event: async ({ event }) => {
+    event: async ({ event }: { event: EventWithProperties }) => {
       logEvent({
         action: "eventReceived",
         eventType: event.type,
-        event: event
+        event: event,
       })
 
       // NEW: permission.asked replaces deprecated permission.updated
@@ -105,12 +113,7 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
           const now = timeProvider.now()
           
           // Skip idle if it's right after an error (error came first)
-          if (lastErrorTime >= 0 && now - lastErrorTime < DEBOUNCE_MS) {
-            logEvent({
-              action: "skipIdleAfterError",
-              timeSinceError: now - lastErrorTime,
-              reason: "Idle event following error - skipping both notifications (cancellation)"
-            })
+          if (lastErrorTime >= 0 && now - lastErrorTime < RACE_CONDITION_DEBOUNCE_MS) {
             return
           }
           
@@ -120,63 +123,24 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
           // Check if this is a subagent session completion
           if (pluginInput) {
             try {
-              const sessionID = (typedEvent.properties as any)?.sessionID
+              const sessionID = typedEvent.properties?.sessionID as string | undefined
               if (sessionID) {
-                const sessionResponse = await pluginInput.client.session.get(sessionID)
+                const sessionResponse = await pluginInput.client.session.get({ path: { id: sessionID } })
                 const session = sessionResponse.data
                 
                 // Use 'subagent' event type if it has a parent session
                 if (session?.parentID) {
                   eventType = "subagent"
-                  logEvent({
-                    action: "subagentCompletion",
-                    sessionID,
-                    parentID: session.parentID,
-                    reason: "Subagent session completed - using 'subagent' event config"
-                  })
                 }
               }
             } catch (error) {
-              logEvent({
-                action: "sessionLookupError",
-                error: error instanceof Error ? error.message : String(error),
-                reason: "Failed to check if session is subagent - using 'complete' event config"
-              })
+              // Silently fallback to 'complete'
             }
           }
           
           // Record idle time FIRST for potential future error debouncing
           lastIdleTime = now
           
-          // Delay idle notification to detect cancellation (error coming right after)
-          let cancelled = false
-          pendingIdleNotification = () => { cancelled = true }
-          
-          await new Promise(resolve => setTimeout(resolve, 50))
-          
-          // Check if error cancelled this notification
-          if (cancelled) {
-            logEvent({
-              action: "skipIdleAfterError",
-              reason: "Idle notification cancelled - error detected during delay (cancellation)"
-            })
-            pendingIdleNotification = null
-            return
-          }
-          
-          // Check if error happened while we were waiting
-          const afterDelay = timeProvider.now()
-          if (lastErrorTime >= 0 && afterDelay - lastErrorTime < DEBOUNCE_MS) {
-            logEvent({
-              action: "skipIdleAfterError",
-              timeSinceError: afterDelay - lastErrorTime,
-              reason: "Idle notification cancelled - error detected during delay (cancellation)"
-            })
-            pendingIdleNotification = null
-            return
-          }
-          
-          pendingIdleNotification = null
           await handleEvent(pluginConfig, eventType)
         }
       }
@@ -185,25 +149,8 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
       if (event.type === "session.error") {
         const now = timeProvider.now()
         
-        // Cancel pending idle notification if one is waiting
-        if (pendingIdleNotification) {
-          logEvent({
-            action: "cancelPendingIdle",
-            reason: "Error occurred while idle notification was pending (cancellation)"
-          })
-          pendingIdleNotification()
-          pendingIdleNotification = null
-          // Don't send error notification either - it's a cancellation
-          return
-        }
-        
         // Skip error if idle just happened (idle came first but already sent notification)
-        if (lastIdleTime >= 0 && now - lastIdleTime < DEBOUNCE_MS) {
-          logEvent({
-            action: "skipErrorAfterIdle",
-            timeSinceIdle: now - lastIdleTime,
-            reason: "Error notification skipped - idle just happened (cancellation)"
-          })
+        if (lastIdleTime >= 0 && now - lastIdleTime < RACE_CONDITION_DEBOUNCE_MS) {
           return
         }
         

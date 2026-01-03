@@ -1,4 +1,5 @@
 import type { Plugin } from "@opencode-ai/plugin"
+
 import { createNotifierPluginInstance } from "./plugin"
 
 // Only export default - OpenCode loads this

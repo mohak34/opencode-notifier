@@ -13,10 +13,6 @@ jest.mock('../src/sound', () => ({
   playSound: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('../src/debug-logging', () => ({
-  logEvent: jest.fn(),
-}));
-
 const mockConfig: NotifierConfig = {
   sound: true,
   notification: true,
@@ -26,7 +22,7 @@ const mockConfig: NotifierConfig = {
     permission: { sound: true, notification: true },
     complete: { sound: true, notification: true },
     error: { sound: true, notification: true },
-    subagent: { sound: true, notification: true }, // Enabled for testing
+    subagent: { sound: true, notification: true },
   },
   messages: {
     permission: 'Permission required',
@@ -55,6 +51,7 @@ jest.mock('../src/config', () => ({
   getSoundPath: jest.fn(() => null),
   getVolume: jest.fn(() => 0.5),
   getImagePath: jest.fn(() => null),
+  RACE_CONDITION_DEBOUNCE_MS: 150,
 }));
 
 import { sendNotification } from '../src/notify';
@@ -82,7 +79,7 @@ describe('Subagent Session Detection', () => {
           get: jest.fn().mockResolvedValue({
             data: {
               id: 'session_123',
-              parentID: undefined, // Main session - no parent
+              parentID: undefined,
             },
           }),
         },
@@ -92,17 +89,19 @@ describe('Subagent Session Detection', () => {
     const plugin = await createNotifierPlugin(mockConfig, mockPluginInput);
 
     mockNow = 0;
-    await plugin.event({
+    const eventPromise = plugin.event({
       event: {
         type: 'session.status',
         properties: {
           sessionID: 'session_123',
           status: { type: 'idle' },
         },
-      },
-    } as EventWithProperties);
+      } as EventWithProperties,
+    });
 
-    // Should use "complete" message for main session
+    jest.advanceTimersByTime(200);
+    await eventPromise;
+
     expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null);
     expect(playSound).toHaveBeenCalledWith('complete', null, 0.5);
   });
@@ -114,7 +113,7 @@ describe('Subagent Session Detection', () => {
           get: jest.fn().mockResolvedValue({
             data: {
               id: 'session_456',
-              parentID: 'session_123', // Subagent - has parent session
+              parentID: 'session_123',
             },
           }),
         },
@@ -124,17 +123,19 @@ describe('Subagent Session Detection', () => {
     const plugin = await createNotifierPlugin(mockConfig, mockPluginInput);
 
     mockNow = 0;
-    await plugin.event({
+    const eventPromise = plugin.event({
       event: {
         type: 'session.status',
         properties: {
           sessionID: 'session_456',
           status: { type: 'idle' },
         },
-      },
-    } as EventWithProperties);
+      } as EventWithProperties,
+    });
 
-    // Should use "subagent" message for delegated task
+    jest.advanceTimersByTime(200);
+    await eventPromise;
+
     expect(sendNotification).toHaveBeenCalledWith('Subagent task complete', 5, null);
     expect(playSound).toHaveBeenCalledWith('subagent', null, 0.5);
   });
@@ -144,7 +145,7 @@ describe('Subagent Session Detection', () => {
       ...mockConfig,
       events: {
         ...mockConfig.events,
-        subagent: { sound: false, notification: false }, // Disabled
+        subagent: { sound: false, notification: false },
       },
     };
 
@@ -154,7 +155,7 @@ describe('Subagent Session Detection', () => {
           get: jest.fn().mockResolvedValue({
             data: {
               id: 'session_456',
-              parentID: 'session_123', // Subagent
+              parentID: 'session_123',
             },
           }),
         },
@@ -164,17 +165,19 @@ describe('Subagent Session Detection', () => {
     const plugin = await createNotifierPlugin(configWithSubagentDisabled, mockPluginInput);
 
     mockNow = 0;
-    await plugin.event({
+    const eventPromise = plugin.event({
       event: {
         type: 'session.status',
         properties: {
           sessionID: 'session_456',
           status: { type: 'idle' },
         },
-      },
-    } as EventWithProperties);
+      } as EventWithProperties,
+    });
 
-    // Should NOT send any notification (both disabled)
+    jest.advanceTimersByTime(200);
+    await eventPromise;
+
     expect(sendNotification).not.toHaveBeenCalled();
     expect(playSound).not.toHaveBeenCalled();
   });
@@ -191,37 +194,40 @@ describe('Subagent Session Detection', () => {
     const plugin = await createNotifierPlugin(mockConfig, mockPluginInput);
 
     mockNow = 0;
-    await plugin.event({
+    const eventPromise = plugin.event({
       event: {
         type: 'session.status',
         properties: {
           sessionID: 'session_unknown',
           status: { type: 'idle' },
         },
-      },
-    } as EventWithProperties);
+      } as EventWithProperties,
+    });
 
-    // Should fallback to "complete" when session lookup fails
+    jest.advanceTimersByTime(200);
+    await eventPromise;
+
     expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null);
     expect(playSound).toHaveBeenCalledWith('complete', null, 0.5);
   });
 
   it('should use "complete" when no pluginInput provided', async () => {
-    // No pluginInput means we can't check session info
     const plugin = await createNotifierPlugin(mockConfig, undefined);
 
     mockNow = 0;
-    await plugin.event({
+    const eventPromise = plugin.event({
       event: {
         type: 'session.status',
         properties: {
           sessionID: 'session_123',
           status: { type: 'idle' },
         },
-      },
-    } as EventWithProperties);
+      } as EventWithProperties,
+    });
 
-    // Should use "complete" as default when can't check
+    jest.advanceTimersByTime(200);
+    await eventPromise;
+
     expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null);
     expect(playSound).toHaveBeenCalledWith('complete', null, 0.5);
   });
@@ -244,34 +250,38 @@ describe('Subagent Session Detection', () => {
 
     const plugin = await createNotifierPlugin(mockConfig, mockPluginInput);
 
-    // First subagent completes
     mockNow = 0;
-    await plugin.event({
+    const eventPromise1 = plugin.event({
       event: {
         type: 'session.status',
         properties: {
           sessionID: 'session_sub1',
           status: { type: 'idle' },
         },
-      },
-    } as EventWithProperties);
+      } as EventWithProperties,
+    });
+
+    jest.advanceTimersByTime(200);
+    await eventPromise1;
 
     expect(sendNotification).toHaveBeenNthCalledWith(1, 'Subagent task complete', 5, null);
     expect(playSound).toHaveBeenNthCalledWith(1, 'subagent', null, 0.5);
 
     jest.clearAllMocks();
 
-    // Second subagent completes (after debounce window)
     mockNow = 1000;
-    await plugin.event({
+    const eventPromise2 = plugin.event({
       event: {
         type: 'session.status',
         properties: {
           sessionID: 'session_sub2',
           status: { type: 'idle' },
         },
-      },
-    } as EventWithProperties);
+      } as EventWithProperties,
+    });
+
+    jest.advanceTimersByTime(200);
+    await eventPromise2;
 
     expect(sendNotification).toHaveBeenNthCalledWith(1, 'Subagent task complete', 5, null);
     expect(playSound).toHaveBeenNthCalledWith(1, 'subagent', null, 0.5);

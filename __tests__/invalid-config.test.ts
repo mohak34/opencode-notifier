@@ -10,10 +10,6 @@ jest.mock('../src/sound', () => ({
   playSound: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('../src/debug-logging', () => ({
-  logEvent: jest.fn(),
-}));
-
 jest.mock('../src/config', () => ({
   isEventSoundEnabled: jest.fn((config: NotifierConfig, eventType: string) => config.events[eventType as keyof typeof config.events].sound),
   isEventNotificationEnabled: jest.fn((config: NotifierConfig, eventType: string) => config.events[eventType as keyof typeof config.events].notification),
@@ -41,21 +37,25 @@ describe('Invalid Config Handling', () => {
         permission: { sound: false, notification: false },
         complete: { sound: false, notification: false },
         error: { sound: false, notification: false },
+        subagent: { sound: false, notification: false },
       },
       messages: {
         permission: '',
         complete: '',
         error: '',
+        subagent: '',
       },
       sounds: {
         permission: null,
         complete: null,
         error: null,
+        subagent: null,
       },
       images: {
         permission: null,
         complete: null,
         error: null,
+        subagent: null,
       },
     };
 
@@ -88,21 +88,25 @@ describe('Invalid Config Handling', () => {
         permission: { sound: true, notification: true },
         complete: { sound: true, notification: true },
         error: { sound: true, notification: true },
+        subagent: { sound: false, notification: false },
       },
       messages: {
         permission: 'Test',
         complete: 'Test',
         error: 'Test',
+        subagent: 'Test',
       },
       sounds: {
         permission: null,
         complete: null,
         error: null,
+        subagent: null,
       },
       images: {
         permission: null,
         complete: null,
         error: null,
+        subagent: null,
       },
     };
 
@@ -132,21 +136,25 @@ describe('Invalid Config Handling', () => {
         permission: { sound: true, notification: true },
         complete: { sound: true, notification: true },
         error: { sound: true, notification: true },
+        subagent: { sound: false, notification: false },
       },
       messages: {
         permission: 'Test',
         complete: 'Test',
         error: 'Test',
+        subagent: 'Test',
       },
       sounds: {
         permission: null,
         complete: null,
         error: null,
+        subagent: null,
       },
       images: {
         permission: null,
         complete: null,
         error: null,
+        subagent: null,
       },
     };
 
@@ -175,21 +183,25 @@ describe('Invalid Config Handling', () => {
         permission: { sound: false, notification: true },
         complete: { sound: false, notification: true },
         error: { sound: false, notification: true },
+        subagent: { sound: false, notification: false },
       },
       messages: {
         permission: longMessage,
         complete: longMessage,
         error: longMessage,
+        subagent: longMessage,
       },
       sounds: {
         permission: null,
         complete: null,
         error: null,
+        subagent: null,
       },
       images: {
         permission: null,
         complete: null,
         error: null,
+        subagent: null,
       },
     };
 
@@ -217,21 +229,25 @@ describe('Invalid Config Handling', () => {
         permission: { sound: false, notification: true },
         complete: { sound: false, notification: true },
         error: { sound: false, notification: true },
+        subagent: { sound: false, notification: false },
       },
       messages: {
-        permission: '⚔️🔴「RED TRUTH」你好 مرحبا',
-        complete: '💛👁️🦋✨',
-        error: '🔥💥🚨',
+        permission: 'Permission needed',
+        complete: 'Done!',
+        error: 'Error',
+        subagent: 'Subagent done',
       },
       sounds: {
         permission: null,
         complete: null,
         error: null,
+        subagent: null,
       },
       images: {
         permission: null,
         complete: null,
         error: null,
+        subagent: null,
       },
     };
 
@@ -248,6 +264,6 @@ describe('Invalid Config Handling', () => {
       },
     });
 
-    expect(sendNotification).toHaveBeenCalledWith('💛👁️🦋✨', 5, null);
+    expect(sendNotification).toHaveBeenCalledWith('Done!', 5, null);
   });
 });
