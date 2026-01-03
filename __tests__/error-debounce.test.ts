@@ -56,6 +56,7 @@ import { logEvent } from '../src/debug-logging';
 
 describe('Error + Complete Race Condition', () => {
   let mockNow = 0;
+  const DEBOUNCE_MS = 150; // Must match plugin.ts DEBOUNCE_MS constant
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -85,7 +86,7 @@ describe('Error + Complete Race Condition', () => {
     expect(playSound).toHaveBeenCalledWith('error', null, 0.5);
   });
 
-  it('should skip idle notification within 2s after error', async () => {
+  it('should skip idle notification within 150ms after error', async () => {
     const plugin = await createNotifierPlugin(mockConfig);
 
     if (!plugin.event) throw new Error('event handler not defined');
@@ -102,8 +103,8 @@ describe('Error + Complete Race Condition', () => {
     // Clear mocks to track only the next call
     jest.clearAllMocks();
 
-    // Advance time by 1 second (within debounce window)
-    mockNow = 1000;
+    // Advance time by 100ms (within debounce window)
+    mockNow = 100;
 
     // Trigger idle event
     await plugin.event({
@@ -126,7 +127,7 @@ describe('Error + Complete Race Condition', () => {
     );
   });
 
-  it('should allow idle notification after 2s debounce window', async () => {
+  it('should allow idle notification after 150ms debounce window', async () => {
     const plugin = await createNotifierPlugin(mockConfig);
 
     if (!plugin.event) throw new Error('event handler not defined');
@@ -143,8 +144,8 @@ describe('Error + Complete Race Condition', () => {
     // Clear mocks
     jest.clearAllMocks();
 
-    // Advance time by 2.1 seconds (outside debounce window)
-    mockNow = 2100;
+    // Advance time by 200ms (outside debounce window)
+    mockNow = 200;
 
     // Trigger idle event
     await plugin.event({
@@ -186,8 +187,8 @@ describe('Error + Complete Race Condition', () => {
 
     jest.clearAllMocks();
 
-    // Advance to 2500ms (1.5s from second error, within new debounce window)
-    mockNow = 2500;
+    // Advance to 1100ms (100ms from second error, within new debounce window)
+    mockNow = 1100;
 
     // Idle should still be skipped
     await plugin.event({
@@ -236,5 +237,81 @@ describe('Error + Complete Race Condition', () => {
     expect(logEvent).not.toHaveBeenCalledWith(
       expect.objectContaining({ action: 'skipIdleAfterError' })
     );
+  });
+
+  it('should skip error notification within 150ms after idle (cancellation scenario)', async () => {
+    const plugin = await createNotifierPlugin(mockConfig);
+
+    if (!plugin.event) throw new Error('event handler not defined');
+
+    // Trigger idle at time 0 (user cancels, idle fires first)
+    mockNow = 0;
+    await plugin.event({
+      event: {
+        type: 'session.status',
+        properties: {
+          status: { type: 'idle' },
+        },
+      },
+    });
+
+    // Clear mocks to track only the next call
+    jest.clearAllMocks();
+
+    // Advance time by 100ms (within debounce window)
+    mockNow = 100;
+
+    // Trigger error event (abort error fires after idle)
+    await plugin.event({
+      event: {
+        type: 'session.error',
+        properties: {},
+      },
+    });
+
+    // Should NOT trigger error notification/sound
+    expect(sendNotification).not.toHaveBeenCalled();
+    expect(playSound).not.toHaveBeenCalled();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'skipErrorAfterIdle',
+        reason: 'Error event following idle (likely cancellation) - skipping to avoid double notification',
+      })
+    );
+  });
+
+  it('should allow error notification after 150ms from idle', async () => {
+    const plugin = await createNotifierPlugin(mockConfig);
+
+    if (!plugin.event) throw new Error('event handler not defined');
+
+    // Trigger idle at time 0
+    mockNow = 0;
+    await plugin.event({
+      event: {
+        type: 'session.status',
+        properties: {
+          status: { type: 'idle' },
+        },
+      },
+    });
+
+    // Clear mocks
+    jest.clearAllMocks();
+
+    // Advance time by 200ms (outside debounce window)
+    mockNow = 200;
+
+    // Trigger error event
+    await plugin.event({
+      event: {
+        type: 'session.error',
+        properties: {},
+      },
+    });
+
+    // Should trigger error notification/sound (it's a real new error)
+    expect(sendNotification).toHaveBeenCalledWith('Error occurred', 5, null);
+    expect(playSound).toHaveBeenCalledWith('error', null, 0.5);
   });
 });

@@ -1,4 +1,4 @@
-import { createNotifierPlugin } from '../src/plugin';
+import { createNotifierPlugin, timeProvider } from '../src/plugin';
 
 // Mock dependencies
 jest.mock('../src/notify', () => ({
@@ -52,8 +52,18 @@ import { sendNotification } from '../src/notify';
 import { playSound } from '../src/sound';
 
 describe('Notification Parameters', () => {
+  let mockNow = 0;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
+    mockNow = 0;
+    timeProvider.now = jest.fn(() => mockNow);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    timeProvider.now = Date.now;
   });
 
   it('should call sendNotification with correct message, timeout, and image for permission', async () => {
@@ -132,6 +142,7 @@ describe('Notification Parameters', () => {
     const plugin = await createNotifierPlugin();
 
     // Permission
+    mockNow = 0;
     await plugin.event({
       event: { type: 'permission.asked', properties: {} },
     } as any);
@@ -151,7 +162,8 @@ describe('Notification Parameters', () => {
 
     jest.clearAllMocks();
 
-    // Complete (idle)
+    // Complete (idle) - advance time to avoid debounce
+    mockNow = 1000;
     await plugin.event({
       event: {
         type: 'session.status',
@@ -168,7 +180,8 @@ describe('Notification Parameters', () => {
 
     jest.clearAllMocks();
 
-    // Error
+    // Error - advance time to avoid debounce
+    mockNow = 2000;
     await plugin.event({
       event: { type: 'session.error', properties: {} },
     } as any);

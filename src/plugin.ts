@@ -64,8 +64,9 @@ async function handleEvent(
 // Exported for testing - allows config injection
 export async function createNotifierPlugin(config?: NotifierConfig) {
   const pluginConfig = config ?? loadConfig()
-  let lastErrorTime = 0
-  const ERROR_IDLE_DEBOUNCE_MS = 2000 // Skip idle events within 2s of error
+  let lastErrorTime = -1
+  let lastIdleTime = -1
+  const DEBOUNCE_MS = 150 // Debounce window for error/idle race conditions (cancellation/errors happen quickly)
 
   logEvent({
     action: "pluginInit",
@@ -99,9 +100,10 @@ export async function createNotifierPlugin(config?: NotifierConfig) {
         const typedEvent = event as EventWithProperties
         const status = typedEvent.properties?.status
         if (status?.type === "idle") {
-          // Skip idle if it's right after an error
           const now = timeProvider.now()
-          if (now - lastErrorTime < ERROR_IDLE_DEBOUNCE_MS) {
+          
+          // Skip idle if it's right after an error (error came first)
+          if (lastErrorTime >= 0 && now - lastErrorTime < DEBOUNCE_MS) {
             logEvent({
               action: "skipIdleAfterError",
               timeSinceError: now - lastErrorTime,
@@ -109,13 +111,28 @@ export async function createNotifierPlugin(config?: NotifierConfig) {
             })
             return
           }
+          
+          // Record idle time for potential future error debouncing
+          lastIdleTime = now
           await handleEvent(pluginConfig, "complete")
         }
       }
 
       // UNCHANGED: session.error still valid
       if (event.type === "session.error") {
-        lastErrorTime = timeProvider.now()
+        const now = timeProvider.now()
+        
+        // Skip error if idle just happened (idle came first - cancellation scenario)
+        if (lastIdleTime >= 0 && now - lastIdleTime < DEBOUNCE_MS) {
+          logEvent({
+            action: "skipErrorAfterIdle",
+            timeSinceIdle: now - lastIdleTime,
+            reason: "Error event following idle (likely cancellation) - skipping to avoid double notification"
+          })
+          return
+        }
+        
+        lastErrorTime = now
         await handleEvent(pluginConfig, "error")
       }
     },
