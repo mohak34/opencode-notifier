@@ -1,4 +1,4 @@
-import { createNotifierPlugin } from '../src/index';
+import { createNotifierPlugin } from '../src/plugin';
 import type { NotifierConfig } from '../src/config';
 
 // Mock dependencies

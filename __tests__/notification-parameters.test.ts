@@ -1,4 +1,4 @@
-import { NotifierPlugin } from '../src/index';
+import { createNotifierPlugin } from '../src/plugin';
 
 // Mock dependencies
 jest.mock('../src/notify', () => ({
@@ -57,7 +57,7 @@ describe('Notification Parameters', () => {
   });
 
   it('should call sendNotification with correct message, timeout, and image for permission', async () => {
-    const plugin = await NotifierPlugin();
+    const plugin = await createNotifierPlugin();
 
     await plugin.event({
       event: {
@@ -74,7 +74,7 @@ describe('Notification Parameters', () => {
   });
 
   it('should call playSound with correct sound path and volume for permission', async () => {
-    const plugin = await NotifierPlugin();
+    const plugin = await createNotifierPlugin();
 
     await plugin.event({
       event: {
@@ -91,7 +91,7 @@ describe('Notification Parameters', () => {
   });
 
   it('should call sendNotification but not playSound when sound disabled', async () => {
-    const plugin = await NotifierPlugin();
+    const plugin = await createNotifierPlugin();
 
     await plugin.event({
       event: {
@@ -109,7 +109,7 @@ describe('Notification Parameters', () => {
   });
 
   it('should call playSound but not sendNotification when notification disabled', async () => {
-    const plugin = await NotifierPlugin();
+    const plugin = await createNotifierPlugin();
 
     await plugin.event({
       event: {
@@ -129,7 +129,7 @@ describe('Notification Parameters', () => {
   });
 
   it('should pass correct parameters for all event types', async () => {
-    const plugin = await NotifierPlugin();
+    const plugin = await createNotifierPlugin();
 
     // Permission
     await plugin.event({
