@@ -102,7 +102,7 @@ describe('Subagent Session Detection', () => {
     jest.advanceTimersByTime(200);
     await eventPromise;
 
-    expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null);
+    expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null, 'OpenCode');
     expect(playSound).toHaveBeenCalledWith('complete', null, 0.5);
   });
 
@@ -136,7 +136,7 @@ describe('Subagent Session Detection', () => {
     jest.advanceTimersByTime(200);
     await eventPromise;
 
-    expect(sendNotification).toHaveBeenCalledWith('Subagent task complete', 5, null);
+    expect(sendNotification).toHaveBeenCalledWith('Subagent task complete', 5, null, 'OpenCode');
     expect(playSound).toHaveBeenCalledWith('subagent', null, 0.5);
   });
 
@@ -207,7 +207,7 @@ describe('Subagent Session Detection', () => {
     jest.advanceTimersByTime(200);
     await eventPromise;
 
-    expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null);
+    expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null, 'OpenCode');
     expect(playSound).toHaveBeenCalledWith('complete', null, 0.5);
   });
 
@@ -228,7 +228,7 @@ describe('Subagent Session Detection', () => {
     jest.advanceTimersByTime(200);
     await eventPromise;
 
-    expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null);
+    expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null, 'OpenCode');
     expect(playSound).toHaveBeenCalledWith('complete', null, 0.5);
   });
 
@@ -264,7 +264,7 @@ describe('Subagent Session Detection', () => {
     jest.advanceTimersByTime(200);
     await eventPromise1;
 
-    expect(sendNotification).toHaveBeenNthCalledWith(1, 'Subagent task complete', 5, null);
+    expect(sendNotification).toHaveBeenNthCalledWith(1, 'Subagent task complete', 5, null, 'OpenCode');
     expect(playSound).toHaveBeenNthCalledWith(1, 'subagent', null, 0.5);
 
     jest.clearAllMocks();
@@ -283,7 +283,7 @@ describe('Subagent Session Detection', () => {
     jest.advanceTimersByTime(200);
     await eventPromise2;
 
-    expect(sendNotification).toHaveBeenNthCalledWith(1, 'Subagent task complete', 5, null);
+    expect(sendNotification).toHaveBeenNthCalledWith(1, 'Subagent task complete', 5, null, 'OpenCode');
     expect(playSound).toHaveBeenNthCalledWith(1, 'subagent', null, 0.5);
   });
 });

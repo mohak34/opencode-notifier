@@ -25,7 +25,8 @@ const lastNotificationTime: Record<string, number> = {}
 export async function sendNotification(
   message: string,
   timeout: number,
-  imagePath: string | null = null
+  imagePath: string | null = null,
+  title: string = "OpenCode"
 ): Promise<void> {
   const now = Date.now()
   if (lastNotificationTime[message] && now - lastNotificationTime[message] < DEBOUNCE_MS) {
@@ -35,7 +36,7 @@ export async function sendNotification(
 
   return new Promise((resolve) => {
     const notificationOptions: Record<string, unknown> = {
-      title: NOTIFICATION_TITLE,
+      title: title,
       message: message,
       timeout: timeout,
     }

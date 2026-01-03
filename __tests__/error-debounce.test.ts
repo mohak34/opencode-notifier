@@ -85,7 +85,7 @@ describe('Error + Complete Race Condition', () => {
     jest.runAllTimers();
     await eventPromise;
 
-    expect(sendNotification).toHaveBeenCalledWith('Error occurred', 5, null);
+    expect(sendNotification).toHaveBeenCalledWith('Error occurred', 5, null, 'OpenCode');
     expect(playSound).toHaveBeenCalledWith('error', null, 0.5);
   });
 
@@ -167,7 +167,7 @@ describe('Error + Complete Race Condition', () => {
     await eventPromise;
 
     // Should trigger complete notification/sound
-    expect(sendNotification).toHaveBeenCalledWith('Task complete', 5, null);
+    expect(sendNotification).toHaveBeenCalledWith('Task complete', 5, null, 'OpenCode');
     expect(playSound).toHaveBeenCalledWith('complete', null, 0.5);
   });
 
@@ -288,7 +288,7 @@ describe('Error + Complete Race Condition', () => {
 
     // Should only have triggered the idle notification, not the error one
     expect(sendNotification).toHaveBeenCalledTimes(1);
-    expect(sendNotification).toHaveBeenCalledWith('Task complete', 5, null);
+    expect(sendNotification).toHaveBeenCalledWith('Task complete', 5, null, 'OpenCode');
     expect(playSound).toHaveBeenCalledTimes(1);
     expect(playSound).toHaveBeenCalledWith('complete', null, 0.5);
   });
@@ -330,7 +330,7 @@ describe('Error + Complete Race Condition', () => {
     await errorPromise;
 
     // Should trigger error notification/sound (it's a real new error)
-    expect(sendNotification).toHaveBeenCalledWith('Error occurred', 5, null);
+    expect(sendNotification).toHaveBeenCalledWith('Error occurred', 5, null, 'OpenCode');
     expect(playSound).toHaveBeenCalledWith('error', null, 0.5);
   });
 });

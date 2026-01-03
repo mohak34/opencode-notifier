@@ -122,7 +122,7 @@ describe('Invalid Config Handling', () => {
     });
 
     // Should still call with null paths
-    expect(sendNotification).toHaveBeenCalledWith('Test', 5, null);
+    expect(sendNotification).toHaveBeenCalledWith('Test', 5, null, 'OpenCode');
     expect(playSound).toHaveBeenCalledWith('permission', null, 0.5);
   });
 
@@ -216,7 +216,7 @@ describe('Invalid Config Handling', () => {
       },
     });
 
-    expect(sendNotification).toHaveBeenCalledWith(longMessage, 5, null);
+    expect(sendNotification).toHaveBeenCalledWith(longMessage, 5, null, 'OpenCode');
   });
 
   it('should handle unicode and emoji in messages', async () => {
@@ -264,6 +264,6 @@ describe('Invalid Config Handling', () => {
       },
     });
 
-    expect(sendNotification).toHaveBeenCalledWith('Done!', 5, null);
+    expect(sendNotification).toHaveBeenCalledWith('Done!', 5, null, 'OpenCode');
   });
 });

@@ -84,7 +84,8 @@ describe('Notification Parameters', () => {
     expect(sendNotification).toHaveBeenCalledWith(
       'Action required',
       10,
-      '/path/to/permission.png'
+      '/path/to/permission.png',
+      'OpenCode'
     );
   });
 
@@ -124,7 +125,8 @@ describe('Notification Parameters', () => {
     expect(sendNotification).toHaveBeenCalledWith(
       'Error',
       10,
-      '/path/to/error.jpg'
+      '/path/to/error.jpg',
+      'OpenCode'
     );
     expect(playSound).not.toHaveBeenCalled();
   });
@@ -168,7 +170,8 @@ describe('Notification Parameters', () => {
       1,
       'Action required',
       10,
-      '/path/to/permission.png'
+      '/path/to/permission.png',
+      'OpenCode'
     );
     expect(playSound).toHaveBeenNthCalledWith(
       1,
@@ -212,7 +215,8 @@ describe('Notification Parameters', () => {
     expect(sendNotification).toHaveBeenCalledWith(
       'Error',
       10,
-      '/path/to/error.jpg'
+      '/path/to/error.jpg',
+      'OpenCode'
     );
     expect(playSound).not.toHaveBeenCalled(); // sound disabled
   });

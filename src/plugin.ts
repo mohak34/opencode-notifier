@@ -35,11 +35,15 @@ export const timeProvider = {
 
 async function handleEvent(
   config: NotifierConfig,
-  eventType: EventType
+  eventType: EventType,
+  sessionTitle: string = "OpenCode"
 ): Promise<void> {
   const promises: Promise<void>[] = []
 
-  const message = getMessage(config, eventType)
+  let message = getMessage(config, eventType)
+  // Replace template variables
+  message = message.replace(/\{\{title\}\}/g, sessionTitle)
+
   const customSoundPath = getSoundPath(config, eventType)
   const customImagePath = getImagePath(config, eventType)
   const volume = getVolume(config)
@@ -52,6 +56,7 @@ async function handleEvent(
     notificationEnabled,
     soundEnabled,
     message,
+    sessionTitle,
     customSoundPath,
     volume,
     config: {
@@ -62,7 +67,7 @@ async function handleEvent(
   })
 
   if (notificationEnabled) {
-    promises.push(sendNotification(message, config.timeout, customImagePath))
+    promises.push(sendNotification(message, config.timeout, customImagePath, sessionTitle))
   }
 
   if (soundEnabled) {
@@ -77,6 +82,7 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
   const pluginConfig = config ?? loadConfig()
   let lastErrorTime = -1
   let lastIdleTime = -1
+  const sessionCache = new Map<string, { title: string; parentID?: string }>()
 
   logEvent({
     action: "pluginInit",
@@ -100,9 +106,45 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
         event: event,
       })
 
+      // Update cache on session lifecycle events
+      if (event.type === "session.created" || event.type === "session.updated") {
+        const info = event.properties?.info as any
+        if (info?.id && info?.title) {
+          sessionCache.set(info.id, {
+            title: info.title,
+            parentID: info.parentID,
+          })
+        }
+      }
+
+      // Determine session title and ID
+      let sessionID = event.properties?.sessionID as string | undefined
+      let sessionTitle = "OpenCode"
+      let parentID: string | undefined
+
+      if (sessionID) {
+        const cached = sessionCache.get(sessionID)
+        if (cached) {
+          sessionTitle = cached.title
+          parentID = cached.parentID
+        } else if (pluginInput) {
+          try {
+            const sessionResponse = await pluginInput.client.session.get({ path: { id: sessionID } })
+            const session = sessionResponse.data
+            if (session) {
+              sessionTitle = session.title || "OpenCode"
+              parentID = session.parentID
+              sessionCache.set(sessionID, { title: sessionTitle, parentID })
+            }
+          } catch (error) {
+            // Silently fallback
+          }
+        }
+      }
+
       // NEW: permission.asked replaces deprecated permission.updated
       if (event.type === "permission.asked") {
-        await handleEvent(pluginConfig, "permission")
+        await handleEvent(pluginConfig, "permission", sessionTitle)
       }
 
       // NEW: session.status replaces deprecated session.idle
@@ -120,28 +162,15 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
           // Determine event type: subagent or complete
           let eventType: EventType = "complete"
           
-          // Check if this is a subagent session completion
-          if (pluginInput) {
-            try {
-              const sessionID = typedEvent.properties?.sessionID as string | undefined
-              if (sessionID) {
-                const sessionResponse = await pluginInput.client.session.get({ path: { id: sessionID } })
-                const session = sessionResponse.data
-                
-                // Use 'subagent' event type if it has a parent session
-                if (session?.parentID) {
-                  eventType = "subagent"
-                }
-              }
-            } catch (error) {
-              // Silently fallback to 'complete'
-            }
+          // Use 'subagent' event type if it has a parent session
+          if (parentID) {
+            eventType = "subagent"
           }
           
           // Record idle time FIRST for potential future error debouncing
           lastIdleTime = now
           
-          await handleEvent(pluginConfig, eventType)
+          await handleEvent(pluginConfig, eventType, sessionTitle)
         }
       }
 
@@ -155,7 +184,7 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
         }
         
         lastErrorTime = now
-        await handleEvent(pluginConfig, "error")
+        await handleEvent(pluginConfig, "error", sessionTitle)
       }
     },
   }
