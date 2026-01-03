@@ -3,24 +3,7 @@ import { loadConfig, isEventSoundEnabled, isEventNotificationEnabled, getMessage
 import type { EventType, NotifierConfig } from "./config"
 import { sendNotification } from "./notify"
 import { playSound } from "./sound"
-import { appendFileSync } from "fs"
-import { join } from "path"
-
-const LOG_FILE = join(process.cwd(), ".opencode_notifier_logs.jsonl")
-const DEBUG = process.env.OPENCODE_NOTIFIER_DEBUG === "true"
-
-function logEvent(data: any): void {
-  if (!DEBUG) return
-  
-  try {
-    appendFileSync(LOG_FILE, JSON.stringify({
-      timestamp: new Date().toISOString(),
-      ...data
-    }) + "\n")
-  } catch (err) {
-    // Silently fail if logging fails
-  }
-}
+import { logEvent } from "./debug-logging"
 
 async function handleEvent(
   config: NotifierConfig,

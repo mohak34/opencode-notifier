@@ -1,22 +1,7 @@
-import { readFileSync, existsSync, appendFileSync } from "fs"
+import { readFileSync, existsSync } from "fs"
 import { join } from "path"
 import { homedir } from "os"
-
-const DEBUG = process.env.OPENCODE_NOTIFIER_DEBUG === "true"
-const LOG_FILE = join(process.cwd(), ".opencode_notifier_logs.jsonl")
-
-function logConfigEvent(data: any): void {
-  if (!DEBUG) return
-  try {
-    appendFileSync(LOG_FILE, JSON.stringify({
-      timestamp: new Date().toISOString(),
-      action: "loadConfig",
-      ...data
-    }) + "\n")
-  } catch {
-    // Silently fail if logging fails
-  }
-}
+import { logEvent } from "./debug-logging"
 
 export type EventType = "permission" | "complete" | "error"
 
@@ -100,13 +85,15 @@ function parseEventConfig(
 export function loadConfig(): NotifierConfig {
   const configPath = getConfigPath()
 
-  logConfigEvent({
+  logEvent({
+    action: "loadConfig",
     configPath,
     exists: existsSync(configPath)
   })
 
   if (!existsSync(configPath)) {
-    logConfigEvent({
+    logEvent({
+      action: "loadConfig",
       result: "usingDefaultConfig",
       reason: "configFileNotFound"
     })
@@ -116,7 +103,8 @@ export function loadConfig(): NotifierConfig {
   try {
     const fileContent = readFileSync(configPath, "utf-8")
     
-    logConfigEvent({
+    logEvent({
+      action: "loadConfig",
       step: "fileRead",
       rawFileContent: fileContent
     })
@@ -155,7 +143,8 @@ export function loadConfig(): NotifierConfig {
       },
     }
 
-    logConfigEvent({
+    logEvent({
+      action: "loadConfig",
       result: "parsedUserConfig",
       parsedUserConfig: userConfig,
       finalConfig: finalConfig
@@ -163,7 +152,8 @@ export function loadConfig(): NotifierConfig {
 
     return finalConfig
   } catch (err) {
-    logConfigEvent({
+    logEvent({
+      action: "loadConfig",
       result: "parseError",
       error: String(err)
     })
