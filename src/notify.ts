@@ -25,7 +25,8 @@ const lastNotificationTime: Record<string, number> = {}
 
 export async function sendNotification(
   message: string,
-  timeout: number
+  timeout: number,
+  imagePath: string | null = null
 ): Promise<void> {
   const now = Date.now()
   if (lastNotificationTime[message] && now - lastNotificationTime[message] < DEBOUNCE_MS) {
@@ -43,6 +44,15 @@ export async function sendNotification(
 
     if (platform === "Darwin") {
       notificationOptions.sound = false
+      // On macOS, use contentImage for the main notification image
+      if (imagePath) {
+        notificationOptions.contentImage = imagePath
+      }
+    } else if (platform === "Windows_NT" || platform === "Linux" || platform.match(/BSD$/)) {
+      // On Windows and Linux, use icon for the notification image
+      if (imagePath) {
+        notificationOptions.icon = imagePath
+      }
     }
 
     platformNotifier.notify(

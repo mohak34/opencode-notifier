@@ -31,6 +31,11 @@ export interface NotifierConfig {
     complete: string | null
     error: string | null
   }
+  images: {
+    permission: string | null
+    complete: string | null
+    error: string | null
+  }
 }
 
 const DEFAULT_EVENT_CONFIG: EventConfig = {
@@ -54,6 +59,11 @@ const DEFAULT_CONFIG: NotifierConfig = {
     error: "OpenCode encountered an error",
   },
   sounds: {
+    permission: null,
+    complete: null,
+    error: null,
+  },
+  images: {
     permission: null,
     complete: null,
     error: null,
@@ -169,6 +179,11 @@ export function loadConfig(): NotifierConfig {
         complete: userConfig.sounds?.complete ?? DEFAULT_CONFIG.sounds.complete,
         error: userConfig.sounds?.error ?? DEFAULT_CONFIG.sounds.error,
       },
+      images: {
+        permission: userConfig.images?.permission ?? DEFAULT_CONFIG.images.permission,
+        complete: userConfig.images?.complete ?? DEFAULT_CONFIG.images.complete,
+        error: userConfig.images?.error ?? DEFAULT_CONFIG.images.error,
+      },
     }
 
     logEvent({
@@ -207,4 +222,8 @@ export function getSoundPath(config: NotifierConfig, event: EventType): string |
 
 export function getVolume(config: NotifierConfig): number {
   return config.volume
+}
+
+export function getImagePath(config: NotifierConfig, event: EventType): string | null {
+  return config.images[event]
 }
