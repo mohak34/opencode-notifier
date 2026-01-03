@@ -3,6 +3,21 @@ import { loadConfig, isEventSoundEnabled, isEventNotificationEnabled, getMessage
 import type { EventType, NotifierConfig } from "./config"
 import { sendNotification } from "./notify"
 import { playSound } from "./sound"
+import { appendFileSync } from "fs"
+import { join } from "path"
+
+const LOG_FILE = join(process.cwd(), "opencode_notifier_logs.jsonl")
+
+function logEvent(data: any): void {
+  try {
+    appendFileSync(LOG_FILE, JSON.stringify({
+      timestamp: new Date().toISOString(),
+      ...data
+    }) + "\n")
+  } catch (err) {
+    // Silently fail if logging fails
+  }
+}
 
 async function handleEvent(
   config: NotifierConfig,
@@ -10,13 +25,30 @@ async function handleEvent(
 ): Promise<void> {
   const promises: Promise<void>[] = []
 
-  if (isEventNotificationEnabled(config, eventType)) {
-    const message = getMessage(config, eventType)
+  const message = getMessage(config, eventType)
+  const customSoundPath = getSoundPath(config, eventType)
+  const notificationEnabled = isEventNotificationEnabled(config, eventType)
+  const soundEnabled = isEventSoundEnabled(config, eventType)
+
+  logEvent({
+    action: "handleEvent",
+    eventType,
+    notificationEnabled,
+    soundEnabled,
+    message,
+    customSoundPath,
+    config: {
+      events: config.events,
+      messages: config.messages,
+      sounds: config.sounds
+    }
+  })
+
+  if (notificationEnabled) {
     promises.push(sendNotification(message, config.timeout))
   }
 
-  if (isEventSoundEnabled(config, eventType)) {
-    const customSoundPath = getSoundPath(config, eventType)
+  if (soundEnabled) {
     promises.push(playSound(eventType, customSoundPath))
   }
 
@@ -27,8 +59,27 @@ export const NotifierPlugin: Plugin = async () => {
   const config = loadConfig()
   const DEBUG = process.env.OPENCODE_NOTIFIER_DEBUG === "true"
 
+  logEvent({
+    action: "pluginInit",
+    configLoaded: true,
+    config: {
+      sound: config.sound,
+      notification: config.notification,
+      timeout: config.timeout,
+      events: config.events,
+      messages: config.messages,
+      sounds: config.sounds
+    }
+  })
+
   return {
     event: async ({ event }) => {
+      logEvent({
+        action: "eventReceived",
+        eventType: event.type,
+        event: event
+      })
+
       if (DEBUG) {
         console.log("[opencode-notifier] Event received:", event.type, JSON.stringify(event, null, 2))
       }
