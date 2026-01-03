@@ -3,6 +3,7 @@ import type { PluginInput } from '@opencode-ai/plugin';
 import type { NotifierConfig } from '../src/config';
 import type { EventWithProperties } from '../src/plugin';
 import { createNotifierPlugin, timeProvider } from '../src/plugin';
+import { sessionCache } from '../src/session-cache';
 
 // Mock dependencies
 jest.mock('../src/notify', () => ({
@@ -68,6 +69,7 @@ describe('Message Templating', () => {
     jest.useFakeTimers();
     mockNow = 0;
     timeProvider.now = jest.fn(() => mockNow);
+    sessionCache.clear();
   });
 
   afterEach(() => {
@@ -126,7 +128,8 @@ describe('Message Templating', () => {
       } as EventWithProperties,
     });
 
-    jest.advanceTimersByTime(200);
+    // Need to advance timers to trigger the delayed handleEvent
+    await jest.advanceTimersByTimeAsync(200);
     await eventPromise;
 
     expect(sendNotification).toHaveBeenCalledWith(

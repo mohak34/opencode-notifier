@@ -122,7 +122,7 @@ describe('Error + Complete Race Condition', () => {
       } as EventWithProperties,
     });
 
-    jest.advanceTimersByTime(100);
+    await jest.advanceTimersByTimeAsync(100);
     await eventPromise;
 
     // Should NOT trigger complete notification/sound
@@ -163,7 +163,7 @@ describe('Error + Complete Race Condition', () => {
       } as EventWithProperties,
     });
 
-    jest.advanceTimersByTime(200);
+    await jest.advanceTimersByTimeAsync(200);
     await eventPromise;
 
     // Should trigger complete notification/sound
@@ -213,7 +213,7 @@ describe('Error + Complete Race Condition', () => {
       } as EventWithProperties,
     });
 
-    jest.advanceTimersByTime(100);
+    await jest.advanceTimersByTimeAsync(100);
     await eventPromise;
 
     expect(sendNotification).not.toHaveBeenCalled();
@@ -286,11 +286,9 @@ describe('Error + Complete Race Condition', () => {
     await eventPromise;
     await errorPromise;
 
-    // Should only have triggered the idle notification, not the error one
-    expect(sendNotification).toHaveBeenCalledTimes(1);
-    expect(sendNotification).toHaveBeenCalledWith('Task complete', 5, null, 'OpenCode');
-    expect(playSound).toHaveBeenCalledTimes(1);
-    expect(playSound).toHaveBeenCalledWith('complete', null, 0.5);
+    // Should NOT trigger error notification/sound
+    expect(sendNotification).not.toHaveBeenCalled();
+    expect(playSound).not.toHaveBeenCalled();
   });
 
   it('should allow error notification after 150ms from idle', async () => {
@@ -309,7 +307,7 @@ describe('Error + Complete Race Condition', () => {
       } as EventWithProperties,
     });
 
-    jest.advanceTimersByTime(200);
+    await jest.advanceTimersByTimeAsync(200);
     await eventPromise;
 
     // Clear mocks

@@ -99,7 +99,7 @@ describe('Subagent Session Detection', () => {
       } as EventWithProperties,
     });
 
-    jest.advanceTimersByTime(200);
+    await jest.advanceTimersByTimeAsync(200);
     await eventPromise;
 
     expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null, 'OpenCode');
@@ -133,7 +133,7 @@ describe('Subagent Session Detection', () => {
       } as EventWithProperties,
     });
 
-    jest.advanceTimersByTime(200);
+    await jest.advanceTimersByTimeAsync(200);
     await eventPromise;
 
     expect(sendNotification).toHaveBeenCalledWith('Subagent task complete', 5, null, 'OpenCode');
@@ -175,7 +175,7 @@ describe('Subagent Session Detection', () => {
       } as EventWithProperties,
     });
 
-    jest.advanceTimersByTime(200);
+    await jest.advanceTimersByTimeAsync(200);
     await eventPromise;
 
     expect(sendNotification).not.toHaveBeenCalled();
@@ -204,7 +204,7 @@ describe('Subagent Session Detection', () => {
       } as EventWithProperties,
     });
 
-    jest.advanceTimersByTime(200);
+    await jest.advanceTimersByTimeAsync(200);
     await eventPromise;
 
     expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null, 'OpenCode');
@@ -225,7 +225,7 @@ describe('Subagent Session Detection', () => {
       } as EventWithProperties,
     });
 
-    jest.advanceTimersByTime(200);
+    await jest.advanceTimersByTimeAsync(200);
     await eventPromise;
 
     expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null, 'OpenCode');
@@ -261,7 +261,7 @@ describe('Subagent Session Detection', () => {
       } as EventWithProperties,
     });
 
-    jest.advanceTimersByTime(200);
+    await jest.advanceTimersByTimeAsync(200);
     await eventPromise1;
 
     expect(sendNotification).toHaveBeenNthCalledWith(1, 'Subagent task complete', 5, null, 'OpenCode');
@@ -280,7 +280,7 @@ describe('Subagent Session Detection', () => {
       } as EventWithProperties,
     });
 
-    jest.advanceTimersByTime(200);
+    await jest.advanceTimersByTimeAsync(200);
     await eventPromise2;
 
     expect(sendNotification).toHaveBeenNthCalledWith(1, 'Subagent task complete', 5, null, 'OpenCode');

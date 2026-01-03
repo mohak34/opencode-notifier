@@ -1,7 +1,6 @@
 // Plugin implementation - all exports here are for testing only
 import type { PluginInput } from "@opencode-ai/plugin"
 
-import { logEvent } from "./debug-logging"
 import {
   getImagePath,
   getMessage,
@@ -13,7 +12,9 @@ import {
   RACE_CONDITION_DEBOUNCE_MS,
 } from "./config"
 import type { EventType, NotifierConfig } from "./config"
+import { logEvent } from "./debug-logging"
 import { sendNotification } from "./notify"
+import { sessionCache } from "./session-cache"
 import { playSound } from "./sound"
 
 // Exported for testing
@@ -82,7 +83,7 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
   const pluginConfig = config ?? loadConfig()
   let lastErrorTime = -1
   let lastIdleTime = -1
-  const sessionCache = new Map<string, { title: string; parentID?: string }>()
+  let pendingIdleNotification: (() => void) | null = null // Cancellation handle for idle notification
 
   logEvent({
     action: "pluginInit",
@@ -108,7 +109,7 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
 
       // Update cache on session lifecycle events
       if (event.type === "session.created" || event.type === "session.updated") {
-        const info = event.properties?.info as any
+        const info = event.properties?.info as { id: string; title: string; parentID?: string } | undefined
         if (info?.id && info?.title) {
           sessionCache.set(info.id, {
             title: info.title,
@@ -118,7 +119,7 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
       }
 
       // Determine session title and ID
-      let sessionID = event.properties?.sessionID as string | undefined
+      const sessionID = event.properties?.sessionID as string | undefined
       let sessionTitle = "OpenCode"
       let parentID: string | undefined
 
@@ -137,7 +138,21 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
               sessionCache.set(sessionID, { title: sessionTitle, parentID })
             }
           } catch (error) {
-            // Silently fallback
+            logEvent({
+              action: "sessionLookupError",
+              sessionID,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            // Optionally notify user via TUI
+            if (pluginInput.client.tui) {
+              await pluginInput.client.tui.showToast({
+                body: {
+                  message: `Notifier failed to lookup session: ${sessionID}`,
+                  variant: "warning",
+                  duration: 3000,
+                },
+              }).catch(() => {}) // Ignore TUI errors
+            }
           }
         }
       }
@@ -153,23 +168,55 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
         const status = typedEvent.properties?.status
         if (status?.type === "idle") {
           const now = timeProvider.now()
-          
+
           // Skip idle if it's right after an error (error came first)
           if (lastErrorTime >= 0 && now - lastErrorTime < RACE_CONDITION_DEBOUNCE_MS) {
+            logEvent({
+              action: "skipIdleAfterError",
+              timeSinceError: now - lastErrorTime,
+              reason: "Idle event following error - skipping both notifications (cancellation)",
+            })
             return
           }
-          
+
           // Determine event type: subagent or complete
           let eventType: EventType = "complete"
-          
+
           // Use 'subagent' event type if it has a parent session
           if (parentID) {
             eventType = "subagent"
           }
-          
+
           // Record idle time FIRST for potential future error debouncing
           lastIdleTime = now
-          
+
+          // Delay idle notification to detect cancellation (error coming right after)
+          let cancelled = false
+          pendingIdleNotification = () => {
+            cancelled = true
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 50))
+
+          // Check if error cancelled this notification
+          if (cancelled) {
+            pendingIdleNotification = null
+            return
+          }
+
+          // Check if error happened while we were waiting
+          const afterDelay = timeProvider.now()
+          if (lastErrorTime >= 0 && afterDelay - lastErrorTime < RACE_CONDITION_DEBOUNCE_MS) {
+            logEvent({
+              action: "skipIdleAfterError",
+              timeSinceError: afterDelay - lastErrorTime,
+              reason: "Idle notification cancelled - error detected during delay (cancellation)",
+            })
+            pendingIdleNotification = null
+            return
+          }
+
+          pendingIdleNotification = null
           await handleEvent(pluginConfig, eventType, sessionTitle)
         }
       }
@@ -178,8 +225,25 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
       if (event.type === "session.error") {
         const now = timeProvider.now()
         
+        // Cancel pending idle notification if one is waiting
+        if (pendingIdleNotification) {
+          logEvent({
+            action: "cancelPendingIdle",
+            reason: "Error occurred while idle notification was pending (cancellation)",
+          })
+          pendingIdleNotification()
+          pendingIdleNotification = null
+          // Don't send error notification either - it's a cancellation
+          return
+        }
+
         // Skip error if idle just happened (idle came first but already sent notification)
         if (lastIdleTime >= 0 && now - lastIdleTime < RACE_CONDITION_DEBOUNCE_MS) {
+          logEvent({
+            action: "skipErrorAfterIdle",
+            timeSinceIdle: now - lastIdleTime,
+            reason: "Error notification skipped - idle just happened (cancellation)",
+          })
           return
         }
         
