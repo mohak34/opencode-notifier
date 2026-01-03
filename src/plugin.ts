@@ -107,13 +107,29 @@ export async function createNotifierPlugin(config?: NotifierConfig) {
             logEvent({
               action: "skipIdleAfterError",
               timeSinceError: now - lastErrorTime,
-              reason: "Idle event following error - skipping to avoid double notification"
+              reason: "Idle event following error - skipping both notifications (cancellation)"
             })
             return
           }
           
-          // Record idle time for potential future error debouncing
+          // Record idle time FIRST for potential future error debouncing
           lastIdleTime = now
+          
+          // Delay idle notification slightly to detect cancellation (error coming right after)
+          // If error arrives within 50ms, it will set lastErrorTime and we skip the notification
+          await new Promise(resolve => setTimeout(resolve, 50))
+          
+          // Check again if error happened while we were waiting
+          const afterDelay = timeProvider.now()
+          if (lastErrorTime >= 0 && afterDelay - lastErrorTime < DEBOUNCE_MS) {
+            logEvent({
+              action: "skipIdleAfterError",
+              timeSinceError: afterDelay - lastErrorTime,
+              reason: "Idle notification cancelled - error detected during delay (cancellation)"
+            })
+            return
+          }
+          
           await handleEvent(pluginConfig, "complete")
         }
       }
@@ -127,7 +143,7 @@ export async function createNotifierPlugin(config?: NotifierConfig) {
           logEvent({
             action: "skipErrorAfterIdle",
             timeSinceIdle: now - lastIdleTime,
-            reason: "Error event following idle (likely cancellation) - skipping to avoid double notification"
+            reason: "Error notification skipped - idle just happened (cancellation)"
           })
           return
         }

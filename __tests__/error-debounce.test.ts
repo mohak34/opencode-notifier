@@ -122,7 +122,7 @@ describe('Error + Complete Race Condition', () => {
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'skipIdleAfterError',
-        reason: 'Idle event following error - skipping to avoid double notification',
+        reason: 'Idle event following error - skipping both notifications (cancellation)',
       })
     );
   });
@@ -275,7 +275,7 @@ describe('Error + Complete Race Condition', () => {
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'skipErrorAfterIdle',
-        reason: 'Error event following idle (likely cancellation) - skipping to avoid double notification',
+        reason: 'Error notification skipped - idle just happened (cancellation)',
       })
     );
   });
