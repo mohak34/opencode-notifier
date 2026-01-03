@@ -6,7 +6,7 @@ import { playSound } from "./sound"
 import { appendFileSync } from "fs"
 import { join } from "path"
 
-const LOG_FILE = join(process.cwd(), "opencode_notifier_logs.jsonl")
+const LOG_FILE = join(process.cwd(), ".opencode_notifier_logs.jsonl")
 const DEBUG = process.env.OPENCODE_NOTIFIER_DEBUG === "true"
 
 function logEvent(data: any): void {
