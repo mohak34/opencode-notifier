@@ -133,7 +133,7 @@ export OPENCODE_NOTIFIER_DEBUG=true
 opencode
 ```
 
-This will create `opencode_notifier_logs.jsonl` in your current directory with detailed logs:
+This will create `.opencode_notifier_logs.jsonl` in your current directory with detailed logs:
 - Plugin initialization with full config
 - Every event received
 - Each notification/sound triggered with config values
