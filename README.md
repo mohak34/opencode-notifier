@@ -173,6 +173,81 @@ Use your own sound files:
 
 If a custom sound file path is provided but the file doesn't exist, the plugin will fall back to the bundled sound.
 
+## Troubleshooting
+
+### macOS: Notifications not showing (only sound works)
+
+**Update to v0.1.8 or later** - this version includes a fix for macOS notification events.
+
+If notifications still don't work after updating:
+
+1. **Install terminal-notifier via Homebrew:**
+
+   ```bash
+   brew install terminal-notifier
+   ```
+
+2. **Check notification permissions:**
+   - Open **System Settings > Notifications**
+   - Find your terminal app (e.g., Ghostty, iTerm2, Terminal)
+   - Make sure notifications are set to **Banners** or **Alerts**
+   - Also enable notifications for **terminal-notifier** if it appears in the list
+
+### Linux: Notifications not showing
+
+1. **Install notify-send:**
+
+   ```bash
+   # Debian/Ubuntu
+   sudo apt install libnotify-bin
+
+   # Fedora
+   sudo dnf install libnotify
+
+   # Arch
+   sudo pacman -S libnotify
+   ```
+
+2. **Test if it works:**
+
+   ```bash
+   notify-send "Test" "Hello"
+   ```
+
+### Linux: Sounds not playing
+
+Install one of these audio players: `paplay`, `aplay`, `mpv`, or `ffplay`.
+
+```bash
+# Debian/Ubuntu (PulseAudio)
+sudo apt install pulseaudio-utils
+
+# Or install mpv
+sudo apt install mpv
+```
+
+### Windows: Notifications not showing
+
+1. Open **Settings > System > Notifications**
+2. Make sure notifications are enabled
+3. Check that your terminal app has notification permissions
+
+### General: Plugin not loading
+
+1. **Check your opencode.json syntax:**
+
+   ```json
+   {
+     "plugin": ["@mohak34/opencode-notifier@latest"]
+   }
+   ```
+
+2. **Clear the cache and restart:**
+
+   ```bash
+   rm -rf ~/.cache/opencode/node_modules/@mohak34/opencode-notifier
+   ```
+
 ## License
 
 MIT
