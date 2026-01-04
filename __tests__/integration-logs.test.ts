@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'bun:test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createNotifierPlugin, timeProvider, type EventWithProperties } from '../src/plugin';
@@ -6,9 +5,11 @@ import type { NotifierConfig } from '../src/config';
 import { sendNotification } from '../src/notify';
 import { playSound } from '../src/sound';
 
-// Mock dependencies
-const mockSendNotification = vi.mocked(sendNotification);
-const mockPlaySound = vi.mocked(playSound);
+jest.mock('../src/notify');
+jest.mock('../src/sound');
+
+const mockSendNotification = sendNotification as jest.MockedFunction<typeof sendNotification>;
+const mockPlaySound = playSound as jest.MockedFunction<typeof playSound>;
 
 const mockConfig: NotifierConfig = {
   sound: true,
@@ -24,7 +25,7 @@ const mockConfig: NotifierConfig = {
   messages: {
     permission: '🗡️ 「RED TRUTH」: {{title}} - Your action is required! 🔴',
     complete: '💛 {{title}}: Without love, it cannot be seen. 👁️',
-    error: '✨ Beatrice: {{title}} - Perhaps a witch\\'s mistake? 🦋',
+    error: "✨ Beatrice: {{title}} - Perhaps a witch's mistake? 🦋",
     subagent: '🎩 Ronove: {{title}} has been processed by the Stakes. 🤵',
   },
   sounds: {
@@ -33,22 +34,28 @@ const mockConfig: NotifierConfig = {
     error: '/Users/[USER]/.config/opencode/sounds/ahaha.mp3',
     subagent: '/Users/[USER]/.config/opencode/sounds/bouncing-stakes.mp3',
   },
+  images: {
+    permission: null,
+    complete: null,
+    error: null,
+    subagent: null,
+  },
 };
 
 describe('Integration: Real log fixture events', () => {
   let plugin: Awaited<ReturnType<typeof createNotifierPlugin>>;
 
   beforeEach(async () => {
-    vi.clearAllMocks();
-    vi.useFakeTimers();
-    timeProvider.now = vi.fn(() => Date.now());
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    timeProvider.now = jest.fn(() => Date.now());
 
     plugin = await createNotifierPlugin(mockConfig);
     if (!plugin.event) throw new Error('Plugin event handler missing');
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    jest.useRealTimers();
   });
 
   it('processes fixture logs and triggers correct notifications/sounds for all event types', async () => {
@@ -62,7 +69,7 @@ describe('Integration: Real log fixture events', () => {
         const event: EventWithProperties = log.event;
         await plugin.event({ event });
         // Advance timers for any debouncing
-        vi.advanceTimersByTime(200);
+        jest.advanceTimersByTime(200);
       }
     }
 

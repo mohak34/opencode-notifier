@@ -113,6 +113,5 @@ export async function playSound(
         break
     }
   } catch {
-    // Silent fail - notification will still work
   }
 }
