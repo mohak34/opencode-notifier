@@ -39,7 +39,7 @@
     "node-notifier": "^10.0.1"
   },
   "devDependencies": {
-    "@opencode-ai/plugin": "^1.0.224",
+    "@opencode-ai/plugin": "1.0.223",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.0.0",
     "@types/node-notifier": "^8.0.5",

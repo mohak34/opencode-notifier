@@ -67,7 +67,7 @@ describe('Invalid Config Handling', () => {
     await expect(async () => {
       await plugin.event({
         event: {
-          type: 'permission.asked',
+          type: 'permission.updated',
           properties: {},
         },
       });
@@ -116,7 +116,7 @@ describe('Invalid Config Handling', () => {
 
     await plugin.event({
       event: {
-        type: 'permission.asked',
+        type: 'permission.updated',
         properties: {},
       },
     });
@@ -211,7 +211,7 @@ describe('Invalid Config Handling', () => {
 
     await plugin.event({
       event: {
-        type: 'permission.asked',
+        type: 'permission.updated',
         properties: {},
       },
     });

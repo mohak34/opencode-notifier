@@ -73,7 +73,7 @@ describe('Notification Parameters', () => {
 
     const eventPromise = plugin.event({
       event: {
-        type: 'permission.asked',
+        type: 'permission.updated',
         properties: {},
       } as EventWithProperties,
     });
@@ -94,7 +94,7 @@ describe('Notification Parameters', () => {
 
     const eventPromise = plugin.event({
       event: {
-        type: 'permission.asked',
+        type: 'permission.updated',
         properties: {},
       } as EventWithProperties,
     });
@@ -160,7 +160,7 @@ describe('Notification Parameters', () => {
     // Permission
     mockNow = 0;
     const eventPromise1 = plugin.event({
-      event: { type: 'permission.asked', properties: {} } as EventWithProperties,
+      event: { type: 'permission.updated', properties: {} } as EventWithProperties,
     });
 
     jest.runAllTimers();
