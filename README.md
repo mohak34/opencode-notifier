@@ -35,7 +35,7 @@ The plugin works out of the box on all platforms. For best results:
 
 ## Configuration
 
-To customize the plugin, create `~/.config/opencode/opencode-notifier.json`:
+To customize the plugin, create `~/.config/opencode/opencode-notifier.json`. The file supports standard JSON and JSON with comments (JSONC).
 
 ```json
 {
@@ -123,6 +123,47 @@ Use your own sound files:
 ```
 
 If a custom sound file path is provided but the file doesn't exist, the plugin will fall back to the bundled sound.
+
+## Debugging
+
+To enable debug logging and see which events are being received:
+
+```bash
+export OPENCODE_NOTIFIER_DEBUG=true
+opencode
+```
+
+This will create `.opencode_notifier_logs.jsonl` in your current directory with detailed logs:
+- Plugin initialization with full config
+- Every event received
+- Each notification/sound triggered with config values
+
+**Example log output**:
+```jsonl
+{"timestamp":"2026-01-03T19:30:00.000Z","action":"pluginInit","configLoaded":true,"config":{"events":{"permission":{"sound":true,"notification":true},...}}}
+{"timestamp":"2026-01-03T19:30:05.000Z","action":"eventReceived","eventType":"session.status",...}
+{"timestamp":"2026-01-03T19:30:05.001Z","action":"handleEvent","eventType":"complete","message":"OpenCode has finished","sessionTitle":"My Project",...}
+```
+
+**Note**: Logging only occurs when `OPENCODE_NOTIFIER_DEBUG=true`. No log file is created in normal use.
+
+## Technical Notes
+
+### Event System Migration (v0.1.8+)
+
+Version 0.1.8 migrates to OpenCode's new event system:
+
+| Event Type | Old Event (deprecated) | New Event (v0.1.8+) |
+|------------|------------------------|---------------------|
+| Permission requests | `permission.updated` | `permission.asked` |
+| Session completion | `session.idle` | `session.status` (with `type: "idle"`) |
+| Errors | `session.error` | `session.error` (unchanged) |
+
+**Why this matters**: The old events (`permission.updated`, `session.idle`) are deprecated in OpenCode core and may not fire reliably. If you're experiencing notification issues, ensure you're using v0.1.8 or later.
+
+**Source verification**: Event structure documented from OpenCode core:
+- `permission.asked`: `packages/opencode/src/permission/next.ts`
+- `session.status`: `packages/opencode/src/session/status.ts`
 
 ## License
 

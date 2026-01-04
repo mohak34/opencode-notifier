@@ -1,15 +1,16 @@
-import { platform } from "os"
-import { join, dirname } from "path"
-import { fileURLToPath } from "url"
-import { existsSync } from "fs"
-import { spawn } from "child_process"
+import { spawn } from "node:child_process"
+import { existsSync } from "node:fs"
+import { platform } from "node:os"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+
+import { DEBOUNCE_MS } from "./config"
 import type { EventType } from "./config"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const DEBOUNCE_MS = 1000
 
 const lastSoundTime: Record<string, number> = {}
-
+ 
 function getBundledSoundPath(event: EventType): string {
   return join(__dirname, "..", "sounds", `${event}.wav`)
 }
@@ -48,12 +49,15 @@ async function runCommand(command: string, args: string[]): Promise<void> {
   })
 }
 
-async function playOnLinux(soundPath: string): Promise<void> {
+async function playOnLinux(soundPath: string, volume: number): Promise<void> {
+  // Convert 0-1 volume to percentage for different players
+  const volumePercent = Math.round(volume * 100)
+  
   const players = [
-    { command: "paplay", args: [soundPath] },
-    { command: "aplay", args: [soundPath] },
-    { command: "mpv", args: ["--no-video", "--no-terminal", soundPath] },
-    { command: "ffplay", args: ["-nodisp", "-autoexit", "-loglevel", "quiet", soundPath] },
+    { command: "paplay", args: [`--volume=${volumePercent * 655}`, soundPath] }, // paplay uses 0-65536
+    { command: "aplay", args: [soundPath] }, // aplay doesn't support volume directly
+    { command: "mpv", args: ["--no-video", "--no-terminal", `--volume=${volumePercent}`, soundPath] },
+    { command: "ffplay", args: ["-nodisp", "-autoexit", "-loglevel", "quiet", "-volume", volumePercent.toString(), soundPath] },
   ]
 
   for (const player of players) {
@@ -66,8 +70,8 @@ async function playOnLinux(soundPath: string): Promise<void> {
   }
 }
 
-async function playOnMac(soundPath: string): Promise<void> {
-  await runCommand("afplay", [soundPath])
+async function playOnMac(soundPath: string, volume: number): Promise<void> {
+  await runCommand("afplay", ["-v", volume.toString(), soundPath])
 }
 
 async function playOnWindows(soundPath: string): Promise<void> {
@@ -77,7 +81,8 @@ async function playOnWindows(soundPath: string): Promise<void> {
 
 export async function playSound(
   event: EventType,
-  customPath: string | null
+  customPath: string | null,
+  volume: number = 1.0
 ): Promise<void> {
   const now = Date.now()
   if (lastSoundTime[event] && now - lastSoundTime[event] < DEBOUNCE_MS) {
@@ -96,10 +101,10 @@ export async function playSound(
   try {
     switch (os) {
       case "darwin":
-        await playOnMac(soundPath)
+        await playOnMac(soundPath, volume)
         break
       case "linux":
-        await playOnLinux(soundPath)
+        await playOnLinux(soundPath, volume)
         break
       case "win32":
         await playOnWindows(soundPath)
@@ -108,6 +113,5 @@ export async function playSound(
         break
     }
   } catch {
-    // Silent fail - notification will still work
   }
 }

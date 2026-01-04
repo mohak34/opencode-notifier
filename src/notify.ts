@@ -1,22 +1,25 @@
-import os from "os"
+import os from "node:os"
+
 import notifier from "node-notifier"
 
+import { DEBOUNCE_MS } from "./config"
+
 const NOTIFICATION_TITLE = "OpenCode"
-const DEBOUNCE_MS = 1000
 
 const platform = os.type()
 
-let platformNotifier: any
+type NotifierInstance = {
+  notify(options?: notifier.Notification, callback?: notifier.NotificationCallback): NotifierInstance
+}
+
+let platformNotifier: NotifierInstance
 
 if (platform === "Linux" || platform.match(/BSD$/)) {
-  const { NotifySend } = notifier
-  platformNotifier = new NotifySend({ withFallback: false })
+  platformNotifier = new notifier.NotifySend({ withFallback: false })
 } else if (platform === "Darwin") {
-  const { NotificationCenter } = notifier
-  platformNotifier = new NotificationCenter({ withFallback: false })
+  platformNotifier = new notifier.NotificationCenter({ withFallback: false })
 } else if (platform === "Windows_NT") {
-  const { WindowsToaster } = notifier
-  platformNotifier = new WindowsToaster({ withFallback: false })
+  platformNotifier = new notifier.WindowsToaster({ withFallback: false })
 } else {
   platformNotifier = notifier
 }
@@ -25,7 +28,9 @@ const lastNotificationTime: Record<string, number> = {}
 
 export async function sendNotification(
   message: string,
-  timeout: number
+  timeout: number,
+  imagePath: string | null = null,
+  title: string = "OpenCode"
 ): Promise<void> {
   const now = Date.now()
   if (lastNotificationTime[message] && now - lastNotificationTime[message] < DEBOUNCE_MS) {
@@ -34,22 +39,25 @@ export async function sendNotification(
   lastNotificationTime[message] = now
 
   return new Promise((resolve) => {
-    const notificationOptions: any = {
-      title: NOTIFICATION_TITLE,
+    const notificationOptions: Record<string, unknown> = {
+      title: title,
       message: message,
       timeout: timeout,
-      icon: undefined,
     }
 
     if (platform === "Darwin") {
       notificationOptions.sound = false
+      if (imagePath) {
+        notificationOptions.contentImage = imagePath
+      }
+    } else if (platform === "Windows_NT" || platform === "Linux" || platform.match(/BSD$/)) {
+      if (imagePath) {
+        notificationOptions.icon = imagePath
+      }
     }
 
-    platformNotifier.notify(
-      notificationOptions,
-      () => {
-        resolve()
-      }
-    )
+    platformNotifier.notify(notificationOptions as notifier.Notification, () => {
+      resolve()
+    })
   })
 }
