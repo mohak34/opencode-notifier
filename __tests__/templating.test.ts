@@ -81,7 +81,9 @@ describe('Message Templating', () => {
     const mockPluginInput = {
       client: {
         session: {
-          get: jest.fn(),
+          get: jest.fn().mockResolvedValue({
+            data: { id: 'session_123', title: 'My Awesome Tab' },
+          }),
         },
       },
     } as unknown as PluginInput;
@@ -91,10 +93,7 @@ describe('Message Templating', () => {
     await plugin.event({
       event: {
         type: 'permission.asked',
-        properties: { 
-          sessionID: 'session_123',
-          info: { id: 'session_123', title: 'My Awesome Tab' }
-        },
+        properties: { sessionID: 'session_123' },
       } as EventWithProperties,
     });
 
@@ -110,7 +109,9 @@ describe('Message Templating', () => {
     const mockPluginInput = {
       client: {
         session: {
-          get: jest.fn(),
+          get: jest.fn().mockResolvedValue({
+            data: { id: 'session_456', title: 'Research Task' },
+          }),
         },
       },
     } as unknown as PluginInput;
@@ -123,7 +124,6 @@ describe('Message Templating', () => {
         properties: {
           sessionID: 'session_456',
           status: { type: 'idle' },
-          info: { id: 'session_456', title: 'Research Task' }
         },
       } as EventWithProperties,
     });
@@ -144,7 +144,9 @@ describe('Message Templating', () => {
     const mockPluginInput = {
       client: {
         session: {
-          get: jest.fn(),
+          get: jest.fn().mockResolvedValue({
+            data: { id: 'session_789', title: 'Coding Session' },
+          }),
         },
       },
     } as unknown as PluginInput;
@@ -154,10 +156,7 @@ describe('Message Templating', () => {
     await plugin.event({
       event: {
         type: 'session.error',
-        properties: { 
-          sessionID: 'session_789',
-          info: { id: 'session_789', title: 'Coding Session' }
-        },
+        properties: { sessionID: 'session_789' },
       } as EventWithProperties,
     });
 
@@ -173,7 +172,9 @@ describe('Message Templating', () => {
     const mockPluginInput = {
       client: {
         session: {
-          get: jest.fn(),
+          get: jest.fn().mockResolvedValue({
+            data: { id: 'session_xxx', title: undefined },
+          }),
         },
       },
     } as unknown as PluginInput;
@@ -183,10 +184,7 @@ describe('Message Templating', () => {
     await plugin.event({
       event: {
         type: 'session.error',
-        properties: { 
-          sessionID: 'session_xxx',
-          info: { id: 'session_xxx', title: undefined }
-        },
+        properties: { sessionID: 'session_xxx' },
       } as EventWithProperties,
     });
 
@@ -198,11 +196,11 @@ describe('Message Templating', () => {
     );
   });
 
-  it('should fallback to "OpenCode" if session lookup fails (now just missing from cache)', async () => {
+  it('should fallback to "OpenCode" if session lookup fails', async () => {
     const mockPluginInput = {
       client: {
         session: {
-          get: jest.fn(),
+          get: jest.fn().mockRejectedValue(new Error('Network error')),
         },
       },
     } as unknown as PluginInput;
@@ -212,7 +210,7 @@ describe('Message Templating', () => {
     await plugin.event({
       event: {
         type: 'session.error',
-        properties: { sessionID: 'session_xxx' }, // No info, not in cache
+        properties: { sessionID: 'session_xxx' },
       } as EventWithProperties,
     });
 

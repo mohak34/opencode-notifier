@@ -110,13 +110,14 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
         event: event,
       })
 
-      // Update cache on any event that carries session info
-      const info = event.properties?.info
-      if (info?.id && info?.title) {
-        sessionCache.set(info.id, {
-          title: info.title,
-          parentID: info.parentID,
-        })
+      if (event.type === "session.created" || event.type === "session.updated") {
+        const info = event.properties?.info
+        if (info?.id && info?.title) {
+          sessionCache.set(info.id, {
+            title: info.title,
+            parentID: info.parentID,
+          })
+        }
       }
 
       const sessionID = event.properties?.sessionID as string | undefined
@@ -128,6 +129,31 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
         if (cached) {
           sessionTitle = cached.title
           parentID = cached.parentID
+        } else if (pluginInput) {
+          try {
+            const sessionResponse = await pluginInput.client.session.get({ path: { id: sessionID } })
+            const session = sessionResponse.data
+            if (session) {
+              sessionTitle = session.title || "OpenCode"
+              parentID = session.parentID
+              sessionCache.set(sessionID, { title: sessionTitle, parentID })
+            }
+          } catch (error) {
+            logEvent({
+              action: "sessionLookupError",
+              sessionID,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            if (pluginInput.client.tui) {
+              await pluginInput.client.tui.showToast({
+                body: {
+                  message: `Notifier failed to lookup session: ${sessionID}`,
+                  variant: "warning",
+                  duration: 3000,
+                },
+              }).catch(() => {})
+            }
+          }
         }
       }
 
