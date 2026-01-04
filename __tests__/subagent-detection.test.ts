@@ -76,12 +76,7 @@ describe('Subagent Session Detection', () => {
     const mockPluginInput = {
       client: {
         session: {
-          get: jest.fn().mockResolvedValue({
-            data: {
-              id: 'session_123',
-              parentID: undefined,
-            },
-          }),
+          get: jest.fn(),
         },
       },
     } as unknown as PluginInput;
@@ -95,6 +90,7 @@ describe('Subagent Session Detection', () => {
         properties: {
           sessionID: 'session_123',
           status: { type: 'idle' },
+          info: { id: 'session_123', title: 'Main Session', parentID: undefined }
         },
       } as EventWithProperties,
     });
@@ -102,7 +98,7 @@ describe('Subagent Session Detection', () => {
     await jest.advanceTimersByTimeAsync(200);
     await eventPromise;
 
-    expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null, 'OpenCode');
+    expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null, 'Main Session');
     expect(playSound).toHaveBeenCalledWith('complete', null, 0.5);
   });
 
@@ -110,12 +106,7 @@ describe('Subagent Session Detection', () => {
     const mockPluginInput = {
       client: {
         session: {
-          get: jest.fn().mockResolvedValue({
-            data: {
-              id: 'session_456',
-              parentID: 'session_123',
-            },
-          }),
+          get: jest.fn(),
         },
       },
     } as unknown as PluginInput;
@@ -129,6 +120,7 @@ describe('Subagent Session Detection', () => {
         properties: {
           sessionID: 'session_456',
           status: { type: 'idle' },
+          info: { id: 'session_456', title: 'Sub Task', parentID: 'session_123' }
         },
       } as EventWithProperties,
     });
@@ -136,7 +128,7 @@ describe('Subagent Session Detection', () => {
     await jest.advanceTimersByTimeAsync(200);
     await eventPromise;
 
-    expect(sendNotification).toHaveBeenCalledWith('Subagent task complete', 5, null, 'OpenCode');
+    expect(sendNotification).toHaveBeenCalledWith('Subagent task complete', 5, null, 'Sub Task');
     expect(playSound).toHaveBeenCalledWith('subagent', null, 0.5);
   });
 
@@ -152,12 +144,7 @@ describe('Subagent Session Detection', () => {
     const mockPluginInput = {
       client: {
         session: {
-          get: jest.fn().mockResolvedValue({
-            data: {
-              id: 'session_456',
-              parentID: 'session_123',
-            },
-          }),
+          get: jest.fn(),
         },
       },
     } as unknown as PluginInput;
@@ -171,6 +158,7 @@ describe('Subagent Session Detection', () => {
         properties: {
           sessionID: 'session_456',
           status: { type: 'idle' },
+          info: { id: 'session_456', title: 'Sub Task', parentID: 'session_123' }
         },
       } as EventWithProperties,
     });
@@ -182,11 +170,11 @@ describe('Subagent Session Detection', () => {
     expect(playSound).not.toHaveBeenCalled();
   });
 
-  it('should fallback to "complete" when session lookup fails', async () => {
+  it('should fallback to "complete" when session info is missing from cache and event', async () => {
     const mockPluginInput = {
       client: {
         session: {
-          get: jest.fn().mockRejectedValue(new Error('Session not found')),
+          get: jest.fn(),
         },
       },
     } as unknown as PluginInput;
@@ -200,6 +188,7 @@ describe('Subagent Session Detection', () => {
         properties: {
           sessionID: 'session_unknown',
           status: { type: 'idle' },
+          // No info here
         },
       } as EventWithProperties,
     });
@@ -211,7 +200,7 @@ describe('Subagent Session Detection', () => {
     expect(playSound).toHaveBeenCalledWith('complete', null, 0.5);
   });
 
-  it('should use "complete" when no pluginInput provided', async () => {
+  it('should use "complete" when no parentID is found', async () => {
     const plugin = await createNotifierPlugin(mockConfig, undefined);
 
     mockNow = 0;
@@ -221,6 +210,7 @@ describe('Subagent Session Detection', () => {
         properties: {
           sessionID: 'session_123',
           status: { type: 'idle' },
+          info: { id: 'session_123', title: 'Standalone' } // No parentID
         },
       } as EventWithProperties,
     });
@@ -228,7 +218,7 @@ describe('Subagent Session Detection', () => {
     await jest.advanceTimersByTimeAsync(200);
     await eventPromise;
 
-    expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null, 'OpenCode');
+    expect(sendNotification).toHaveBeenCalledWith('Main task complete', 5, null, 'Standalone');
     expect(playSound).toHaveBeenCalledWith('complete', null, 0.5);
   });
 
@@ -236,14 +226,7 @@ describe('Subagent Session Detection', () => {
     const mockPluginInput = {
       client: {
         session: {
-          get: jest
-            .fn()
-            .mockResolvedValueOnce({
-              data: { id: 'session_sub1', parentID: 'session_main' },
-            })
-            .mockResolvedValueOnce({
-              data: { id: 'session_sub2', parentID: 'session_main' },
-            }),
+          get: jest.fn(),
         },
       },
     } as unknown as PluginInput;
@@ -257,6 +240,7 @@ describe('Subagent Session Detection', () => {
         properties: {
           sessionID: 'session_sub1',
           status: { type: 'idle' },
+          info: { id: 'session_sub1', title: 'Sub 1', parentID: 'session_main' }
         },
       } as EventWithProperties,
     });
@@ -264,7 +248,7 @@ describe('Subagent Session Detection', () => {
     await jest.advanceTimersByTimeAsync(200);
     await eventPromise1;
 
-    expect(sendNotification).toHaveBeenNthCalledWith(1, 'Subagent task complete', 5, null, 'OpenCode');
+    expect(sendNotification).toHaveBeenNthCalledWith(1, 'Subagent task complete', 5, null, 'Sub 1');
     expect(playSound).toHaveBeenNthCalledWith(1, 'subagent', null, 0.5);
 
     jest.clearAllMocks();
@@ -276,6 +260,7 @@ describe('Subagent Session Detection', () => {
         properties: {
           sessionID: 'session_sub2',
           status: { type: 'idle' },
+          info: { id: 'session_sub2', title: 'Sub 2', parentID: 'session_main' }
         },
       } as EventWithProperties,
     });
@@ -283,7 +268,7 @@ describe('Subagent Session Detection', () => {
     await jest.advanceTimersByTimeAsync(200);
     await eventPromise2;
 
-    expect(sendNotification).toHaveBeenNthCalledWith(1, 'Subagent task complete', 5, null, 'OpenCode');
+    expect(sendNotification).toHaveBeenNthCalledWith(1, 'Subagent task complete', 5, null, 'Sub 2');
     expect(playSound).toHaveBeenNthCalledWith(1, 'subagent', null, 0.5);
   });
 });
