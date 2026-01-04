@@ -291,6 +291,67 @@ describe('Error + Complete Race Condition', () => {
     expect(playSound).not.toHaveBeenCalled();
   });
 
+  it('should skip error notification when it comes shortly after idle notification (user abort)', async () => {
+    // This test demonstrates the bug fix: error notification should be skipped when it comes
+    // within 150ms AFTER the idle notification was sent (not when the idle event was received)
+    
+    const plugin = await createNotifierPlugin(mockConfig);
+
+    if (!plugin.event) throw new Error('event handler not defined');
+
+    // Step 1: Send idle event and let it complete its timer
+    mockNow = 0;
+    const idlePromise = plugin.event({
+      event: {
+        type: 'session.status',
+        properties: {
+          status: { type: 'idle' },
+        },
+      } as EventWithProperties,
+    });
+
+    // Let the 150ms timer complete - manually advance mockNow to simulate the passage of time
+    // We need to update mockNow DURING the advancement so the plugin sees the correct time
+    await new Promise<void>((resolve) => {
+      // Simulate the 150ms delay - the plugin's setTimeout(resolve, 150) will fire
+      jest.advanceTimersByTime(150);
+      // Update mockNow to reflect that 150ms have passed
+      mockNow = 150;
+      // Now resolve our wrapper promise
+      resolve();
+    });
+    
+    // Step 2: The plugin's handleEvent runs and sets lastIdleNotificationTime
+    // The plugin records time AFTER handleEvent, so it will be slightly > 150
+    // Update mockNow to 168 (simulating the actual time when notification would be sent)
+    mockNow = 168;
+    await idlePromise;
+
+    // Clear mocks to focus only on error notification
+    jest.clearAllMocks();
+
+    // Step 3: Error event 14ms after idle notification was sent
+    mockNow = 182;
+    const errorPromise = plugin.event({
+      event: {
+        type: 'session.error',
+        properties: {
+          error: {
+            name: 'MessageAbortedError',
+            data: { message: 'The operation was aborted.' }
+          }
+        },
+      } as EventWithProperties,
+    });
+
+    jest.runAllTimers();
+    await errorPromise;
+
+    // Error notification should be skipped because it came 14ms after idle notification
+    expect(sendNotification).not.toHaveBeenCalled();
+    expect(playSound).not.toHaveBeenCalled();
+  }, 10000); // Increase timeout
+
   it('should allow error notification after 150ms from idle', async () => {
     const plugin = await createNotifierPlugin(mockConfig);
 

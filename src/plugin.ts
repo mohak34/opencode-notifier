@@ -88,6 +88,7 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
   const pluginConfig = config ?? loadConfig()
   let lastErrorTime = -1
   let lastIdleTime = -1
+  let lastIdleNotificationTime = -1  // NEW: Track when idle notification was actually sent
   let pendingIdleNotification: (() => void) | null = null // Cancellation handle for idle notification
 
   logEvent({
@@ -213,6 +214,9 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
 
           pendingIdleNotification = null
           await handleEvent(pluginConfig, eventType, sessionTitle)
+          
+          // NEW: Record when idle notification was actually sent
+          lastIdleNotificationTime = timeProvider.now()
         }
       }
 
@@ -232,12 +236,12 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
           return
         }
 
-        // Skip error if idle just happened (idle came first but already sent notification)
-        if (lastIdleTime >= 0 && now - lastIdleTime < RACE_CONDITION_DEBOUNCE_MS) {
+        // NEW: Skip error if idle notification was just sent (idle came first and notification already sent)
+        if (lastIdleNotificationTime >= 0 && now - lastIdleNotificationTime < RACE_CONDITION_DEBOUNCE_MS) {
           logEvent({
-            action: "skipErrorAfterIdle",
-            timeSinceIdle: now - lastIdleTime,
-            reason: "Error notification skipped - idle just happened (cancellation)",
+            action: "skipErrorAfterIdleNotification",
+            timeSinceIdleNotification: now - lastIdleNotificationTime,
+            reason: "Error notification skipped - idle notification just happened (cancellation)",
           })
           return
         }
