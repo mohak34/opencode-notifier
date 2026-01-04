@@ -3,7 +3,6 @@ import type { PluginInput } from '@opencode-ai/plugin';
 import type { NotifierConfig } from '../src/config';
 import type { EventWithProperties } from '../src/plugin';
 import { createNotifierPlugin, timeProvider } from '../src/plugin';
-import { sessionCache } from '../src/session-cache';
 
 // Mock dependencies
 jest.mock('../src/notify', () => ({
@@ -69,7 +68,6 @@ describe('Message Templating', () => {
     jest.useFakeTimers();
     mockNow = 0;
     timeProvider.now = jest.fn(() => mockNow);
-    sessionCache.clear();
   });
 
   afterEach(() => {
@@ -220,43 +218,5 @@ describe('Message Templating', () => {
       null,
       'OpenCode'
     );
-  });
-
-  it('should use cached title instead of calling API', async () => {
-    const mockPluginInput = {
-      client: {
-        session: {
-          get: jest.fn(), // Should NOT be called for the second event
-        },
-      },
-    } as unknown as PluginInput;
-
-    const plugin = await createNotifierPlugin(mockConfig, mockPluginInput);
-
-    // 1. Populate cache via session.created event
-    await plugin.event({
-      event: {
-        type: 'session.created',
-        properties: {
-          info: { id: 'session_cache', title: 'Cached Title' },
-        },
-      } as any,
-    });
-
-    // 2. Trigger error event - should use cache
-    await plugin.event({
-      event: {
-        type: 'session.error',
-        properties: { sessionID: 'session_cache' },
-      } as EventWithProperties,
-    });
-
-    expect(sendNotification).toHaveBeenCalledWith(
-      'Error in Cached Title',
-      5,
-      null,
-      'Cached Title'
-    );
-    expect(mockPluginInput.client.session.get).not.toHaveBeenCalled();
   });
 });
