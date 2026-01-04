@@ -14,7 +14,6 @@ import {
 import type { EventType, NotifierConfig } from "./config"
 import { logEvent } from "./debug-logging"
 import { sendNotification } from "./notify"
-import { sessionCache } from "./session-cache"
 import { playSound } from "./sound"
 
 // Exported for testing
@@ -113,25 +112,37 @@ export async function createNotifierPlugin(config?: NotifierConfig, pluginInput?
         event: event,
       })
 
-      // Update cache on any event that carries session info
-      const info = event.properties?.info
-      if (info?.id && info?.title) {
-        sessionCache.set(info.id, {
-          title: info.title,
-          parentID: info.parentID,
-        })
-      }
-
       // Determine session title and ID
       const sessionID = event.properties?.sessionID as string | undefined
       let sessionTitle = "OpenCode"
       let parentID: string | undefined
 
       if (sessionID) {
-        const cached = sessionCache.get(sessionID)
-        if (cached) {
-          sessionTitle = cached.title
-          parentID = cached.parentID
+        if (pluginInput) {
+          try {
+            const sessionResponse = await pluginInput.client.session.get({ path: { id: sessionID } })
+            const session = sessionResponse.data
+            if (session) {
+              sessionTitle = session.title || "OpenCode"
+              parentID = session.parentID
+            }
+          } catch (error) {
+            logEvent({
+              action: "sessionLookupError",
+              sessionID,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            // Optionally notify user via TUI
+            if (pluginInput.client.tui) {
+              await pluginInput.client.tui.showToast({
+                body: {
+                  message: `Notifier failed to lookup session: ${sessionID}`,
+                  variant: "warning",
+                  duration: 3000,
+                },
+              }).catch(() => {})
+            }
+          }
         }
       }
 
