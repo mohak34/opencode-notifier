@@ -31,12 +31,12 @@ export interface NotifierConfig {
 }
 
 const DEFAULT_EVENT_CONFIG: EventConfig = {
-  sound: false,
+  sound: true,
   notification: true,
 }
 
 const DEFAULT_CONFIG: NotifierConfig = {
-  sound: false,
+  sound: true,
   notification: true,
   timeout: 5,
   events: {
