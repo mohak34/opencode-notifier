@@ -54,7 +54,8 @@ export async function sendNotification(
 
     platformNotifier.notify(
       notificationOptions,
-      () => {
+      (error: any, _response: any) => {
+        if (error) console.error(error)
         resolve()
       }
     )

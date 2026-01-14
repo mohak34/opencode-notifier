@@ -91,19 +91,27 @@ To customize the plugin, create `~/.config/opencode/opencode-notifier.json`:
   "sound": true,
   "notification": true,
   "timeout": 5,
+  "command": {
+    "enabled": false,
+    "path": "/path/to/command",
+    "args": ["--event", "{event}", "--message", "{message}"]
+  },
   "events": {
     "permission": { "sound": true, "notification": true },
     "complete": { "sound": true, "notification": true },
+    "subagent_complete": { "sound": false, "notification": false },
     "error": { "sound": true, "notification": true }
   },
   "messages": {
     "permission": "OpenCode needs permission",
     "complete": "OpenCode has finished",
+    "subagent_complete": "Subagent has finished",
     "error": "OpenCode encountered an error"
   },
   "sounds": {
     "permission": "/path/to/custom/sound.wav",
     "complete": "/path/to/custom/sound.wav",
+    "subagent_complete": "/path/to/custom/sound.wav",
     "error": "/path/to/custom/sound.wav"
   }
 }
@@ -116,6 +124,7 @@ To customize the plugin, create `~/.config/opencode/opencode-notifier.json`:
 | `sound` | boolean | `true` | Global toggle for all sounds |
 | `notification` | boolean | `true` | Global toggle for all notifications |
 | `timeout` | number | `5` | Notification duration in seconds (Linux only) |
+| `command` | object | — | Command execution settings (enabled/path/args) |
 
 ### Events
 
@@ -126,6 +135,7 @@ Control sound and notification separately for each event:
   "events": {
     "permission": { "sound": true, "notification": true },
     "complete": { "sound": false, "notification": true },
+    "subagent_complete": { "sound": true, "notification": false },
     "error": { "sound": true, "notification": false }
   }
 }
@@ -138,10 +148,13 @@ Or use a boolean to toggle both:
   "events": {
     "permission": true,
     "complete": false,
+    "subagent_complete": true,
     "error": true
   }
 }
 ```
+
+Note: `complete` fires for primary (main) session completion, while `subagent_complete` fires for subagent completion. `subagent_complete` defaults to disabled (both sound and notification are false).
 
 ### Messages
 
@@ -152,7 +165,28 @@ Customize notification text:
   "messages": {
     "permission": "Action required",
     "complete": "Done!",
+    "subagent_complete": "Subagent finished",
     "error": "Something went wrong"
+  }
+}
+```
+
+### Command
+
+Run a custom command when events fire. Use `{event}` and `{message}` tokens in `path` or `args` to inject the event name and message.
+
+`command.minDuration` (optional, seconds) gates command execution based on the elapsed prompt execution time.
+- Applies to all events for the custom command.
+- If elapsed time is known and is below `minDuration`, the command is skipped.
+- If elapsed time cannot be determined for an event, the command still runs.
+
+```json
+{
+  "command": {
+    "enabled": true,
+    "path": "/path/to/command",
+    "args": ["--event", "{event}", "--message", "{message}"],
+    "minDuration": 10
   }
 }
 ```
@@ -166,12 +200,37 @@ Use your own sound files:
   "sounds": {
     "permission": "/home/user/sounds/alert.wav",
     "complete": "/home/user/sounds/done.wav",
+    "subagent_complete": "/home/user/sounds/subagent-done.wav",
     "error": "/home/user/sounds/error.wav"
   }
 }
 ```
 
 If a custom sound file path is provided but the file doesn't exist, the plugin will fall back to the bundled sound.
+
+### Example: Different behaviors for main and subagent completion
+
+You may want different notification behaviors for primary sessions versus subagent sessions. For example:
+
+- **Main session completion**: Play a sound and show a system notification
+- **Subagent completion**: Play a different sound, but no system notification
+
+```json
+{
+  "events": {
+    "complete": { "sound": true, "notification": true },
+    "subagent_complete": { "sound": true, "notification": false }
+  },
+  "messages": {
+    "complete": "OpenCode has finished",
+    "subagent_complete": "Subagent task completed"
+  },
+  "sounds": {
+    "complete": "/home/user/sounds/main-done.wav",
+    "subagent_complete": "/home/user/sounds/subagent-chime.wav"
+  }
+}
+```
 
 ## Troubleshooting
 
