@@ -190,17 +190,10 @@ If a custom sound file path is provided but the file doesn't exist, the plugin w
 
 If notifications still don't work after updating:
 
-1. **Install terminal-notifier via Homebrew:**
-
-   ```bash
-   brew install terminal-notifier
-   ```
-
-2. **Check notification permissions:**
+1. **Check notification permissions:**
    - Open **System Settings > Notifications**
-   - Find your terminal app (e.g., Ghostty, iTerm2, Terminal)
+   - Find **Script Editor** in the list
    - Make sure notifications are set to **Banners** or **Alerts**
-   - Also enable notifications for **terminal-notifier** if it appears in the list
 
 ### Linux: Notifications not showing
 
