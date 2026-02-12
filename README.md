@@ -84,6 +84,24 @@ The plugin works out of the box on all platforms. For best results:
 
 **Note**: To disable icons, set `showIcon: false` in your configuration.
 
+### macOS: Choosing Your Notification System
+
+On macOS, you can choose between two notification backends:
+
+- **`osascript`** (default): Most reliable method that always works. Uses AppleScript to display notifications. **Limitation**: Cannot display custom icons (shows Script Editor icon instead).
+
+- **`node-notifier`**: Supports custom icons but some users experience reliability issues where notifications don't appear.
+
+To use `node-notifier` with custom icons:
+
+```json
+{
+  "notificationSystem": "node-notifier"
+}
+```
+
+If you experience missing notifications with `node-notifier`, switch back to `osascript` (or remove the option to use the default).
+
 ## Configuration
 
 To customize the plugin, create `~/.config/opencode/opencode-notifier.json`:
@@ -95,6 +113,7 @@ To customize the plugin, create `~/.config/opencode/opencode-notifier.json`:
   "timeout": 5,
   "showProjectName": true,
   "showIcon": true,
+  "notificationSystem": "osascript",
   "command": {
     "enabled": false,
     "path": "/path/to/command",
@@ -134,6 +153,7 @@ To customize the plugin, create `~/.config/opencode/opencode-notifier.json`:
 | `timeout` | number | `5` | Notification duration in seconds (Linux only) |
 | `showProjectName` | boolean | `true` | Show project folder name in notification title |
 | `showIcon` | boolean | `true` | Show OpenCode icon in notifications |
+| `notificationSystem` | string | `"osascript"` | macOS only: `"osascript"` (reliable, no icons) or `"node-notifier"` (icons, may have issues) |
 | `command` | object | — | Command execution settings (enabled/path/args/minDuration) |
 
 ### Events

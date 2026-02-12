@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.19] - 2026-02-12
+
+### Added
+- macOS notification system selector (#23)
+- `notificationSystem` config option: `"osascript"` (default, reliable) or `"node-notifier"` (icons)
+- Choose between reliable notifications (osascript) or custom icons (node-notifier) on macOS
+
+## [0.1.18] - 2026-02-06
+
+### Added
+- Icon support for notifications on Windows and Linux
+- OpenCode logo displays in system notifications
+- New `showIcon` config option (default: true)
+
+### Notes
+- macOS uses osascript which doesn't support custom icons (shows Script Editor icon)
+
 ## [0.1.15] - 2026-01-20
 
 ### Fixed

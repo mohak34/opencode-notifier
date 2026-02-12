@@ -24,7 +24,8 @@ export async function sendNotification(
   title: string,
   message: string,
   timeout: number,
-  iconPath?: string
+  iconPath?: string,
+  notificationSystem: "osascript" | "node-notifier" = "osascript"
 ): Promise<void> {
   const now = Date.now()
   if (lastNotificationTime[message] && now - lastNotificationTime[message] < DEBOUNCE_MS) {
@@ -33,6 +34,24 @@ export async function sendNotification(
   lastNotificationTime[message] = now
 
   if (platform === "Darwin") {
+    if (notificationSystem === "node-notifier") {
+      return new Promise((resolve) => {
+        const notificationOptions: any = {
+          title: title,
+          message: message,
+          timeout: timeout,
+          icon: iconPath,
+        }
+
+        notifier.notify(
+          notificationOptions,
+          () => {
+            resolve()
+          }
+        )
+      })
+    }
+
     return new Promise((resolve) => {
       const escapedMessage = message.replace(/"/g, '\\"')
       const escapedTitle = title.replace(/"/g, '\\"')

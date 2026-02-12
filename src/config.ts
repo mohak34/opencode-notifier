@@ -23,6 +23,7 @@ export interface NotifierConfig {
   timeout: number
   showProjectName: boolean
   showIcon: boolean
+  notificationSystem: "osascript" | "node-notifier"
   command: CommandConfig
   events: {
     permission: EventConfig
@@ -58,6 +59,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
   timeout: 5,
   showProjectName: true,
   showIcon: true,
+  notificationSystem: "osascript",
   command: {
     enabled: false,
     path: "",
@@ -151,6 +153,7 @@ export function loadConfig(): NotifierConfig {
           : DEFAULT_CONFIG.timeout,
       showProjectName: userConfig.showProjectName ?? DEFAULT_CONFIG.showProjectName,
       showIcon: userConfig.showIcon ?? DEFAULT_CONFIG.showIcon,
+      notificationSystem: userConfig.notificationSystem === "node-notifier" ? "node-notifier" : "osascript",
       command: {
         enabled: typeof userCommand.enabled === "boolean" ? userCommand.enabled : DEFAULT_CONFIG.command.enabled,
         path: typeof userCommand.path === "string" ? userCommand.path : DEFAULT_CONFIG.command.path,
