@@ -24,6 +24,18 @@ You'll get notified when:
 
 There's also `subagent_complete` for when subagents finish, but that's silent by default so you don't get spammed.
 
+## Commands
+
+**Toggle notification sounds**
+
+Run the `notifier.mute` command in OpenCode to instantly mute or unmute notification sounds. Perfect for meetings or focus time.
+
+When you toggle, you'll see:
+- 🔇 **Notification sounds muted** - sounds are off
+- 🔊 **Notification sounds unmuted** - sounds are back on
+
+Your setting persists across restarts. Desktop notifications continue to appear regardless of mute state.
+
 ## Setup by platform
 
 **macOS**: Nothing to do, works out of the box. Shows the Script Editor icon.

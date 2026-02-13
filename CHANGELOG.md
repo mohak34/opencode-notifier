@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- `notifier.mute` command to toggle notification sounds on/off without restarting OpenCode
+- Persistent mute state that survives restarts (saved to config file as optional `muted` field)
+- Visual feedback with emoji indicators (🔇 muted / 🔊 unmuted) when toggling
+- Sounds-only muting: desktop notifications continue to appear when muted
+
 ## [0.1.19] - 2026-02-12
 
 ### Added
