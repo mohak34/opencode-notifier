@@ -1,10 +1,12 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin"
 import { basename } from "path"
-import { loadConfig, isEventSoundEnabled, isEventNotificationEnabled, getMessage, getSoundPath, getIconPath } from "./config"
+import { loadConfig, isEventSoundEnabled, isEventNotificationEnabled, getMessage, getSoundPath, getIconPath, loadMuteState, persistMuteState } from "./config"
 import type { EventType, NotifierConfig } from "./config"
 import { sendNotification } from "./notify"
 import { playSound } from "./sound"
 import { runCommand } from "./command"
+
+let soundsMuted = false
 
 function getNotificationTitle(config: NotifierConfig, projectName: string | null): string {
   if (config.showProjectName && projectName) {
@@ -29,7 +31,7 @@ async function handleEvent(
     promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem))
   }
 
-  if (isEventSoundEnabled(config, eventType)) {
+  if (!soundsMuted && isEventSoundEnabled(config, eventType)) {
     const customSoundPath = getSoundPath(config, eventType)
     promises.push(playSound(eventType, customSoundPath))
   }
@@ -129,8 +131,34 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
   const config = loadConfig()
   const projectName = directory ? basename(directory) : null
 
+  soundsMuted = loadMuteState()
+
+  await (client.config as any).update({
+    config: {
+      command: {
+        "notifier.mute": {
+          template: "notifier.mute",
+          description: "Toggle notification sounds on/off"
+        }
+      }
+    }
+  })
+
   return {
-    event: async ({ event }) => {
+    "command.execute.before": async (input: any, output: any) => {
+      if (input.command === "notifier.mute") {
+        soundsMuted = !soundsMuted
+        persistMuteState(soundsMuted)
+        output.parts = [{
+          id: "toggle-response",
+          sessionID: input.sessionID,
+          messageID: input.sessionID,
+          type: "text",
+          text: soundsMuted ? "🔇 Notification sounds muted" : "🔊 Notification sounds unmuted"
+        }]
+      }
+    },
+    event: async ({ event }: any) => {
       if (event.type === "permission.updated") {
         await handleEventWithElapsedTime(client, config, "permission", projectName, event)
       }
@@ -160,12 +188,12 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
     "permission.ask": async () => {
       await handleEvent(config, "permission", projectName, null)
     },
-    "tool.execute.before": async (input) => {
+    "tool.execute.before": async (input: any) => {
       if (input.tool === "question") {
         await handleEvent(config, "question", projectName, null)
       }
     },
-  }
+  } as any
 }
 
 export default NotifierPlugin

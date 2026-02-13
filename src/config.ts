@@ -222,3 +222,30 @@ export function getIconPath(config: NotifierConfig): string | undefined {
   
   return undefined
 }
+
+export function loadMuteState(): boolean {
+  const configPath = getConfigPath()
+  try {
+    const content = readFileSync(configPath, "utf-8")
+    const config = JSON.parse(content)
+    return config.muted ?? false
+  } catch {
+    return false
+  }
+}
+
+export function persistMuteState(muted: boolean): void {
+  const configPath = getConfigPath()
+  try {
+    let config: any = {}
+    if (existsSync(configPath)) {
+      const content = readFileSync(configPath, "utf-8")
+      config = JSON.parse(content)
+    }
+    const updated = { ...config, muted }
+    const { writeFileSync } = require("fs")
+    writeFileSync(configPath, JSON.stringify(updated, null, 2), "utf-8")
+  } catch (error) {
+    console.error("Failed to persist mute state:", error)
+  }
+}
