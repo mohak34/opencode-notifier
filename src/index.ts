@@ -1,10 +1,12 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin"
+import { tool } from "@opencode-ai/plugin"
 import { basename } from "path"
 import { loadConfig, isEventSoundEnabled, isEventNotificationEnabled, getMessage, getSoundPath, getIconPath } from "./config"
 import type { EventType, NotifierConfig } from "./config"
 import { sendNotification } from "./notify"
 import { playSound } from "./sound"
 import { runCommand } from "./command"
+import { executeSoundToggle, type SoundToggleAction } from "./sound-toggle"
 
 function getNotificationTitle(config: NotifierConfig, projectName: string | null): string {
   if (config.showProjectName && projectName) {
@@ -130,6 +132,18 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
   const projectName = directory ? basename(directory) : null
 
   return {
+    tool: {
+      "sound-toggle": tool({
+        description: "Toggle sounds on/off for opencode-notifier plugin. Use this to enable, disable, or check the status of sounds.",
+        args: {
+          action: tool.schema.enum(["toggle", "enable", "disable", "status"]).describe("The action to perform: 'toggle' to switch between on/off, 'enable' to turn sounds on, 'disable' to turn sounds off, 'status' to check current sound status"),
+        },
+        async execute(args: { action: SoundToggleAction }) {
+          const result = executeSoundToggle(args.action)
+          return result.message
+        },
+      }),
+    },
     event: async ({ event }) => {
       if (event.type === "permission.updated") {
         await handleEventWithElapsedTime(client, config, "permission", projectName, event)

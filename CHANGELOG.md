@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.20] - Unreleased
+
+### Added
+- `sound-toggle` custom tool - Enable, disable, toggle, or check sound status directly from OpenCode
+- Use natural language: "Use sound-toggle to disable sounds" or "Use sound-toggle to check status"
+- Config file path can be overridden via `OPENCODE_NOTIFIER_CONFIG_PATH` environment variable for testing
+
 ## [0.1.19] - 2026-02-12
 
 ### Added

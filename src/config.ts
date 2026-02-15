@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from "fs"
+import { readFileSync, existsSync, writeFileSync } from "fs"
 import { join, dirname } from "path"
 import { homedir } from "os"
 import { fileURLToPath } from "url"
@@ -88,7 +88,10 @@ const DEFAULT_CONFIG: NotifierConfig = {
   },
 }
 
-function getConfigPath(): string {
+export function getConfigPath(): string {
+  if (process.env.OPENCODE_NOTIFIER_CONFIG_PATH) {
+    return process.env.OPENCODE_NOTIFIER_CONFIG_PATH
+  }
   return join(homedir(), ".config", "opencode", "opencode-notifier.json")
 }
 
@@ -221,4 +224,72 @@ export function getIconPath(config: NotifierConfig): string | undefined {
   }
   
   return undefined
+}
+
+export function saveConfig(config: NotifierConfig): void {
+  const configPath = getConfigPath()
+  
+  const userConfig: Record<string, unknown> = {
+    sound: config.sound,
+    notification: config.notification,
+    timeout: config.timeout,
+    showProjectName: config.showProjectName,
+    showIcon: config.showIcon,
+    notificationSystem: config.notificationSystem,
+  }
+
+  const defaultWithGlobal: EventConfig = {
+    sound: config.sound,
+    notification: config.notification,
+  }
+
+  userConfig.events = {
+    permission: config.events.permission.sound !== defaultWithGlobal.sound || config.events.permission.notification !== defaultWithGlobal.notification 
+      ? config.events.permission 
+      : undefined,
+    complete: config.events.complete.sound !== defaultWithGlobal.sound || config.events.complete.notification !== defaultWithGlobal.notification 
+      ? config.events.complete 
+      : undefined,
+    subagent_complete: config.events.subagent_complete.sound !== false || config.events.subagent_complete.notification !== false 
+      ? config.events.subagent_complete 
+      : undefined,
+    error: config.events.error.sound !== defaultWithGlobal.sound || config.events.error.notification !== defaultWithGlobal.notification 
+      ? config.events.error 
+      : undefined,
+    question: config.events.question.sound !== defaultWithGlobal.sound || config.events.question.notification !== defaultWithGlobal.notification 
+      ? config.events.question 
+      : undefined,
+  }
+
+  if (config.command.enabled || config.command.path) {
+    userConfig.command = {
+      enabled: config.command.enabled,
+      path: config.command.path,
+      args: config.command.args,
+      minDuration: config.command.minDuration,
+    }
+  }
+
+  userConfig.messages = config.messages
+
+  const cleanedConfig: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(userConfig)) {
+    if (value !== undefined) {
+      cleanedConfig[key] = value
+    }
+  }
+
+  const nestedEvents = cleanedConfig.events as Record<string, unknown> | undefined
+  if (nestedEvents) {
+    for (const [key, value] of Object.entries(nestedEvents)) {
+      if (value === undefined) {
+        delete nestedEvents[key]
+      }
+    }
+    if (Object.keys(nestedEvents).length === 0) {
+      delete cleanedConfig.events
+    }
+  }
+
+  writeFileSync(configPath, JSON.stringify(cleanedConfig, null, 2) + "\n", "utf-8")
 }
