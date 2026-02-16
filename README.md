@@ -52,6 +52,7 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
   "notification": true,
   "timeout": 5,
   "showProjectName": true,
+  "showSessionTitle": true,
   "showIcon": true,
   "notificationSystem": "osascript",
   "command": {
@@ -68,11 +69,11 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
     "question": { "sound": true, "notification": true }
   },
   "messages": {
-    "permission": "Session needs permission",
-    "complete": "Session has finished",
-    "subagent_complete": "Subagent task completed",
-    "error": "Session encountered an error",
-    "question": "Session has a question"
+    "permission": "Session needs permission: {sessionTitle}",
+    "complete": "Session has finished: {sessionTitle}",
+    "subagent_complete": "Subagent task completed: {sessionTitle}",
+    "error": "Session encountered an error: {sessionTitle}",
+    "question": "Session has a question: {sessionTitle}"
   },
   "sounds": {
     "permission": null,
@@ -94,6 +95,7 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
   "notification": true,
   "timeout": 5,
   "showProjectName": true,
+  "showSessionTitle": true,
   "showIcon": true,
   "notificationSystem": "osascript"
 }
@@ -103,6 +105,7 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
 - `notification` - Turn notifications on/off (default: true)
 - `timeout` - How long notifications show in seconds, Linux only (default: 5)
 - `showProjectName` - Show folder name in notification title (default: true)
+- `showSessionTitle` - Include the session title in notification messages via `{sessionTitle}` placeholder (default: true)
 - `showIcon` - Show OpenCode icon, Windows/Linux only (default: true)
 - `notificationSystem` - macOS only: `"osascript"` or `"node-notifier"` (default: "osascript")
 
@@ -139,14 +142,23 @@ Customize the notification text:
 ```json
 {
   "messages": {
-    "permission": "Session needs permission",
-    "complete": "Session has finished",
-    "subagent_complete": "Subagent task completed",
-    "error": "Session encountered an error",
-    "question": "Session has a question"
+    "permission": "Session needs permission: {sessionTitle}",
+    "complete": "Session has finished: {sessionTitle}",
+    "subagent_complete": "Subagent task completed: {sessionTitle}",
+    "error": "Session encountered an error: {sessionTitle}",
+    "question": "Session has a question: {sessionTitle}"
   }
 }
 ```
+
+Messages support placeholder tokens that get replaced with actual values:
+
+- `{sessionTitle}` - The title/summary of the current session (e.g. "Fix login bug")
+- `{projectName}` - The project folder name
+
+When `showSessionTitle` is `false`, `{sessionTitle}` is replaced with an empty string. Any trailing separators (`: `, ` - `, ` | `) are automatically cleaned up when a placeholder resolves to empty.
+
+To disable session titles in messages without changing `showSessionTitle`, just remove the `{sessionTitle}` placeholder from your custom messages.
 
 ### Sounds
 
@@ -171,7 +183,7 @@ Platform notes:
 
 ### Custom commands
 
-Run your own script when something happens. Use `{event}` and `{message}` as placeholders:
+Run your own script when something happens. Use `{event}`, `{message}`, and `{sessionTitle}` as placeholders:
 
 ```json
 {
@@ -186,7 +198,7 @@ Run your own script when something happens. Use `{event}` and `{message}` as pla
 
 - `enabled` - Turn command on/off
 - `path` - Path to your script/executable
-- `args` - Arguments to pass, can use `{event}` and `{message}` tokens
+- `args` - Arguments to pass, can use `{event}`, `{message}`, and `{sessionTitle}` tokens
 - `minDuration` - Skip if response was quick, avoids spam (seconds)
 
 #### Example: Log events to a file

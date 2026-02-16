@@ -17,11 +17,17 @@ export interface CommandConfig {
   minDuration?: number
 }
 
+export interface MessageContext {
+  sessionTitle?: string | null
+  projectName?: string | null
+}
+
 export interface NotifierConfig {
   sound: boolean
   notification: boolean
   timeout: number
   showProjectName: boolean
+  showSessionTitle: boolean
   showIcon: boolean
   notificationSystem: "osascript" | "node-notifier"
   command: CommandConfig
@@ -58,6 +64,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
   notification: true,
   timeout: 5,
   showProjectName: true,
+  showSessionTitle: true,
   showIcon: true,
   notificationSystem: "osascript",
   command: {
@@ -73,11 +80,11 @@ const DEFAULT_CONFIG: NotifierConfig = {
     question: { ...DEFAULT_EVENT_CONFIG },
   },
   messages: {
-    permission: "Session needs permission",
-    complete: "Session has finished",
-    subagent_complete: "Subagent task completed",
-    error: "Session encountered an error",
-    question: "Session has a question",
+    permission: "Session needs permission: {sessionTitle}",
+    complete: "Session has finished: {sessionTitle}",
+    subagent_complete: "Subagent task completed: {sessionTitle}",
+    error: "Session encountered an error: {sessionTitle}",
+    question: "Session has a question: {sessionTitle}",
   },
   sounds: {
     permission: null,
@@ -152,6 +159,7 @@ export function loadConfig(): NotifierConfig {
           ? userConfig.timeout
           : DEFAULT_CONFIG.timeout,
       showProjectName: userConfig.showProjectName ?? DEFAULT_CONFIG.showProjectName,
+      showSessionTitle: userConfig.showSessionTitle ?? DEFAULT_CONFIG.showSessionTitle,
       showIcon: userConfig.showIcon ?? DEFAULT_CONFIG.showIcon,
       notificationSystem: userConfig.notificationSystem === "node-notifier" ? "node-notifier" : "osascript",
       command: {
@@ -221,4 +229,22 @@ export function getIconPath(config: NotifierConfig): string | undefined {
   }
   
   return undefined
+}
+
+export function interpolateMessage(message: string, context: MessageContext): string {
+  let result = message
+
+  const sessionTitle = context.sessionTitle || ""
+  result = result.replaceAll("{sessionTitle}", sessionTitle)
+
+  const projectName = context.projectName || ""
+  result = result.replaceAll("{projectName}", projectName)
+
+  // Clean up artifacts from empty placeholder replacements
+  // Remove trailing separators like ": ", " - ", " | " left after empty substitution
+  result = result.replace(/\s*[:\-|]\s*$/, "").trim()
+  // Collapse multiple spaces into one
+  result = result.replace(/\s{2,}/g, " ")
+
+  return result
 }
