@@ -9,11 +9,11 @@ All notable changes to this project will be documented in this file.
 - Shows "Session was interrupted" instead of duplicate error+completion notifications
 - Only one sound plays when interruption is detected
 - Auto-cleanup of error tracking to prevent memory leaks
+ - Fix placeholder interpolation so `{sessionTitle}` is removed when disabled
 
 ### Changed
-- Simplified overlapping notification prevention logic
-- Replaced 4 Maps with 1 Map for better memory management
-- Removed 350ms artificial delay
+- Restored PR #29's 350ms delay and 4-map tracking for reliable race handling
+- Added cleanup for session maps to avoid leaks
 
 ## [0.1.21] - 2026-02-18
 
