@@ -1,19 +1,23 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin"
 import { basename } from "path"
-import {
-  loadConfig,
-  isEventSoundEnabled,
-  isEventNotificationEnabled,
-  getMessage,
-  getSoundPath,
-  getIconPath,
-  getSoundVolume,
-  interpolateMessage,
-} from "./config"
+import { loadConfig, isEventSoundEnabled, isEventNotificationEnabled, getMessage, getSoundPath, getIconPath, getSoundVolume, interpolateMessage } from "./config"
 import type { EventType, NotifierConfig } from "./config"
 import { sendNotification } from "./notify"
 import { playSound } from "./sound"
 import { runCommand } from "./command"
+
+// Track recent errors to detect when both error and completion fire together (e.g., Esc pressed)
+const recentErrors = new Map<string, number>()
+
+// Cleanup old entries every 5 minutes to prevent memory leaks
+setInterval(() => {
+  const cutoff = Date.now() - 5 * 60 * 1000
+  for (const [sessionID, timestamp] of recentErrors) {
+    if (timestamp < cutoff) {
+      recentErrors.delete(sessionID)
+    }
+  }
+}, 5 * 60 * 1000)
 
 function getNotificationTitle(config: NotifierConfig, projectName: string | null): string {
   if (config.showProjectName && projectName) {
@@ -75,7 +79,8 @@ function getSessionIDFromEvent(event: unknown): string | null {
 
 async function getElapsedSinceLastPrompt(
   client: PluginInput["client"],
-  sessionID: string
+  sessionID: string,
+  nowMs: number = Date.now()
 ): Promise<number | null> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
@@ -92,7 +97,7 @@ async function getElapsedSinceLastPrompt(
     }
 
     if (lastUserMessageTime !== null) {
-      return (Date.now() - lastUserMessageTime) / 1000
+      return (nowMs - lastUserMessageTime) / 1000
     }
   } catch {
   }
@@ -174,11 +179,21 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
       if (event.type === "session.idle") {
         const sessionID = getSessionIDFromEvent(event)
         if (sessionID) {
-          const sessionInfo = await getSessionInfo(client, sessionID)
-          if (!sessionInfo.isChild) {
-            await handleEventWithElapsedTime(client, config, "complete", projectName, event, sessionInfo.title)
+          // Check if error happened recently (within 500ms) - indicates Esc was pressed
+          const errorTime = recentErrors.get(sessionID)
+          if (errorTime && Date.now() - errorTime < 500) {
+            // Both error and completion fired together = interrupted
+            recentErrors.delete(sessionID)
+            const sessionInfo = await getSessionInfo(client, sessionID)
+            await handleEventWithElapsedTime(client, config, "interrupted", projectName, event, sessionInfo.title)
           } else {
-            await handleEventWithElapsedTime(client, config, "subagent_complete", projectName, event, sessionInfo.title)
+            // Normal completion - check if it's a subagent and get session title
+            const sessionInfo = await getSessionInfo(client, sessionID)
+            if (!sessionInfo.isChild) {
+              await handleEventWithElapsedTime(client, config, "complete", projectName, event, sessionInfo.title)
+            } else {
+              await handleEventWithElapsedTime(client, config, "subagent_complete", projectName, event, sessionInfo.title)
+            }
           }
         } else {
           await handleEventWithElapsedTime(client, config, "complete", projectName, event)
@@ -187,12 +202,29 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
 
       if (event.type === "session.error") {
         const sessionID = getSessionIDFromEvent(event)
-        let sessionTitle: string | null = null
-        if (sessionID && config.showSessionTitle) {
-          const info = await getSessionInfo(client, sessionID)
-          sessionTitle = info.title
+        if (sessionID) {
+          // Record that error happened - we'll check this when completion fires
+          recentErrors.set(sessionID, Date.now())
+          
+          // Get session title for the error notification
+          let sessionTitle: string | null = null
+          if (config.showSessionTitle) {
+            const info = await getSessionInfo(client, sessionID)
+            sessionTitle = info.title
+          }
+          
+          // For real errors (not interrupted), show error after a short delay
+          // to see if completion follows immediately
+          setTimeout(() => {
+            // If still in map, it wasn't followed by completion = real error
+            if (recentErrors.has(sessionID)) {
+              recentErrors.delete(sessionID)
+              void handleEventWithElapsedTime(client, config, "error", projectName, event, sessionTitle)
+            }
+          }, 100)
+        } else {
+          await handleEventWithElapsedTime(client, config, "error", projectName, event)
         }
-        await handleEventWithElapsedTime(client, config, "error", projectName, event, sessionTitle)
       }
     },
     "permission.ask": async () => {

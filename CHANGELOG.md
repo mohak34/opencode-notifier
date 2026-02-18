@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.22] - 2026-02-18
+
+### Added
+- New `interrupted` event for when sessions are cancelled (e.g., Esc pressed) (#29) - @minpeter
+- Shows "Session was interrupted" instead of duplicate error+completion notifications
+- Only one sound plays when interruption is detected
+- Auto-cleanup of error tracking to prevent memory leaks
+
+### Changed
+- Simplified overlapping notification prevention logic
+- Replaced 4 Maps with 1 Map for better memory management
+- Removed 350ms artificial delay
+
 ## [0.1.21] - 2026-02-18
 
 ### Added
