@@ -3,7 +3,7 @@ import { join, dirname } from "path"
 import { homedir } from "os"
 import { fileURLToPath } from "url"
 
-export type EventType = "permission" | "complete" | "subagent_complete" | "error" | "question"
+export type EventType = "permission" | "complete" | "subagent_complete" | "error" | "question" | "interrupted"
 
 export interface EventConfig {
   sound: boolean
@@ -31,6 +31,7 @@ export interface NotifierConfig {
     subagent_complete: EventConfig
     error: EventConfig
     question: EventConfig
+    interrupted: EventConfig
   }
   messages: {
     permission: string
@@ -38,6 +39,7 @@ export interface NotifierConfig {
     subagent_complete: string
     error: string
     question: string
+    interrupted: string
   }
   sounds: {
     permission: string | null
@@ -45,6 +47,7 @@ export interface NotifierConfig {
     subagent_complete: string | null
     error: string | null
     question: string | null
+    interrupted: string | null
   }
 }
 
@@ -71,6 +74,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
     subagent_complete: { sound: false, notification: false },
     error: { ...DEFAULT_EVENT_CONFIG },
     question: { ...DEFAULT_EVENT_CONFIG },
+    interrupted: { ...DEFAULT_EVENT_CONFIG },
   },
   messages: {
     permission: "Session needs permission",
@@ -78,6 +82,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
     subagent_complete: "Subagent task completed",
     error: "Session encountered an error",
     question: "Session has a question",
+    interrupted: "Session was interrupted",
   },
   sounds: {
     permission: null,
@@ -85,6 +90,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
     subagent_complete: null,
     error: null,
     question: null,
+    interrupted: null,
   },
 }
 
@@ -166,6 +172,7 @@ export function loadConfig(): NotifierConfig {
         subagent_complete: parseEventConfig(userConfig.events?.subagent_complete ?? userConfig.subagent_complete, { sound: false, notification: false }),
         error: parseEventConfig(userConfig.events?.error ?? userConfig.error, defaultWithGlobal),
         question: parseEventConfig(userConfig.events?.question ?? userConfig.question, defaultWithGlobal),
+        interrupted: parseEventConfig(userConfig.events?.interrupted ?? userConfig.interrupted, defaultWithGlobal),
       },
       messages: {
         permission: userConfig.messages?.permission ?? DEFAULT_CONFIG.messages.permission,
@@ -173,6 +180,7 @@ export function loadConfig(): NotifierConfig {
         subagent_complete: userConfig.messages?.subagent_complete ?? DEFAULT_CONFIG.messages.subagent_complete,
         error: userConfig.messages?.error ?? DEFAULT_CONFIG.messages.error,
         question: userConfig.messages?.question ?? DEFAULT_CONFIG.messages.question,
+        interrupted: userConfig.messages?.interrupted ?? DEFAULT_CONFIG.messages.interrupted,
       },
       sounds: {
         permission: userConfig.sounds?.permission ?? DEFAULT_CONFIG.sounds.permission,
@@ -180,6 +188,7 @@ export function loadConfig(): NotifierConfig {
         subagent_complete: userConfig.sounds?.subagent_complete ?? DEFAULT_CONFIG.sounds.subagent_complete,
         error: userConfig.sounds?.error ?? DEFAULT_CONFIG.sounds.error,
         question: userConfig.sounds?.question ?? DEFAULT_CONFIG.sounds.question,
+        interrupted: userConfig.sounds?.interrupted ?? DEFAULT_CONFIG.sounds.interrupted,
       },
     }
   } catch {

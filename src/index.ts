@@ -6,12 +6,18 @@ import { sendNotification } from "./notify"
 import { playSound } from "./sound"
 import { runCommand } from "./command"
 
-const IDLE_COMPLETE_DELAY_MS = 350
+// Track recent errors to detect when both error and completion fire together (e.g., Esc pressed)
+const recentErrors = new Map<string, number>()
 
-const pendingIdleTimers = new Map<string, ReturnType<typeof setTimeout>>()
-const sessionIdleSequence = new Map<string, number>()
-const sessionErrorSuppressionAt = new Map<string, number>()
-const sessionLastBusyAt = new Map<string, number>()
+// Cleanup old entries every 5 minutes to prevent memory leaks
+setInterval(() => {
+  const cutoff = Date.now() - 5 * 60 * 1000
+  for (const [sessionID, timestamp] of recentErrors) {
+    if (timestamp < cutoff) {
+      recentErrors.delete(sessionID)
+    }
+  }
+}, 5 * 60 * 1000)
 
 function getNotificationTitle(config: NotifierConfig, projectName: string | null): string {
   if (config.showProjectName && projectName) {
@@ -65,60 +71,6 @@ function getSessionIDFromEvent(event: unknown): string | null {
   return null
 }
 
-function clearPendingIdleTimer(sessionID: string): void {
-  const timer = pendingIdleTimers.get(sessionID)
-  if (!timer) {
-    return
-  }
-
-  clearTimeout(timer)
-  pendingIdleTimers.delete(sessionID)
-}
-
-function bumpSessionIdleSequence(sessionID: string): number {
-  const nextSequence = (sessionIdleSequence.get(sessionID) ?? 0) + 1
-  sessionIdleSequence.set(sessionID, nextSequence)
-  return nextSequence
-}
-
-function hasCurrentSessionIdleSequence(sessionID: string, sequence: number): boolean {
-  return sessionIdleSequence.get(sessionID) === sequence
-}
-
-function markSessionError(sessionID: string | null): void {
-  if (!sessionID) {
-    return
-  }
-
-  sessionErrorSuppressionAt.set(sessionID, Date.now())
-  bumpSessionIdleSequence(sessionID)
-  clearPendingIdleTimer(sessionID)
-}
-
-function markSessionBusy(sessionID: string): void {
-  const now = Date.now()
-  sessionLastBusyAt.set(sessionID, now)
-  sessionErrorSuppressionAt.delete(sessionID)
-  bumpSessionIdleSequence(sessionID)
-  clearPendingIdleTimer(sessionID)
-}
-
-function shouldSuppressSessionIdle(sessionID: string): boolean {
-  const errorAt = sessionErrorSuppressionAt.get(sessionID)
-  if (errorAt === undefined) {
-    return false
-  }
-
-  const busyAt = sessionLastBusyAt.get(sessionID)
-  if (typeof busyAt === "number" && busyAt > errorAt) {
-    sessionErrorSuppressionAt.delete(sessionID)
-    return false
-  }
-
-  sessionErrorSuppressionAt.delete(sessionID)
-  return true
-}
-
 async function getElapsedSinceLastPrompt(
   client: PluginInput["client"],
   sessionID: string,
@@ -160,63 +112,12 @@ async function isChildSession(
   }
 }
 
-async function processSessionIdle(
-  client: PluginInput["client"],
-  config: NotifierConfig,
-  projectName: string | null,
-  event: unknown,
-  sessionID: string,
-  sequence: number,
-  idleReceivedAtMs: number
-): Promise<void> {
-  if (!hasCurrentSessionIdleSequence(sessionID, sequence)) {
-    return
-  }
-
-  if (shouldSuppressSessionIdle(sessionID)) {
-    return
-  }
-
-  const isChild = await isChildSession(client, sessionID)
-
-  if (!hasCurrentSessionIdleSequence(sessionID, sequence)) {
-    return
-  }
-
-  if (!isChild) {
-    await handleEventWithElapsedTime(client, config, "complete", projectName, event, idleReceivedAtMs)
-    return
-  }
-
-  await handleEventWithElapsedTime(client, config, "subagent_complete", projectName, event, idleReceivedAtMs)
-}
-
-function scheduleSessionIdle(
-  client: PluginInput["client"],
-  config: NotifierConfig,
-  projectName: string | null,
-  event: unknown,
-  sessionID: string
-): void {
-  clearPendingIdleTimer(sessionID)
-  const sequence = bumpSessionIdleSequence(sessionID)
-  const idleReceivedAtMs = Date.now()
-
-  const timer = setTimeout(() => {
-    pendingIdleTimers.delete(sessionID)
-    void processSessionIdle(client, config, projectName, event, sessionID, sequence, idleReceivedAtMs).catch(() => undefined)
-  }, IDLE_COMPLETE_DELAY_MS)
-
-  pendingIdleTimers.set(sessionID, timer)
-}
-
 async function handleEventWithElapsedTime(
   client: PluginInput["client"],
   config: NotifierConfig,
   eventType: EventType,
   projectName: string | null,
-  event: unknown,
-  elapsedReferenceNowMs?: number
+  event: unknown
 ): Promise<void> {
   const minDuration = config.command?.minDuration
   const shouldLookupElapsed =
@@ -231,7 +132,7 @@ async function handleEventWithElapsedTime(
   if (shouldLookupElapsed) {
     const sessionID = getSessionIDFromEvent(event)
     if (sessionID) {
-      elapsedSeconds = await getElapsedSinceLastPrompt(client, sessionID, elapsedReferenceNowMs)
+      elapsedSeconds = await getElapsedSinceLastPrompt(client, sessionID)
     }
   }
 
@@ -255,19 +156,44 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
       if (event.type === "session.idle") {
         const sessionID = getSessionIDFromEvent(event)
         if (sessionID) {
-          scheduleSessionIdle(client, config, projectName, event, sessionID)
+          // Check if error happened recently (within 500ms) - indicates Esc was pressed
+          const errorTime = recentErrors.get(sessionID)
+          if (errorTime && Date.now() - errorTime < 500) {
+            // Both error and completion fired together = interrupted
+            recentErrors.delete(sessionID)
+            await handleEventWithElapsedTime(client, config, "interrupted", projectName, event)
+          } else {
+            // Normal completion - check if it's a subagent
+            const isChild = await isChildSession(client, sessionID)
+            if (!isChild) {
+              await handleEventWithElapsedTime(client, config, "complete", projectName, event)
+            } else {
+              await handleEventWithElapsedTime(client, config, "subagent_complete", projectName, event)
+            }
+          }
         } else {
           await handleEventWithElapsedTime(client, config, "complete", projectName, event)
         }
       }
 
-      if (event.type === "session.status" && event.properties.status.type === "busy") {
-        markSessionBusy(event.properties.sessionID)
-      }
-
       if (event.type === "session.error") {
-        markSessionError(getSessionIDFromEvent(event))
-        await handleEventWithElapsedTime(client, config, "error", projectName, event)
+        const sessionID = getSessionIDFromEvent(event)
+        if (sessionID) {
+          // Record that error happened - we'll check this when completion fires
+          recentErrors.set(sessionID, Date.now())
+          
+          // For real errors (not interrupted), show error after a short delay
+          // to see if completion follows immediately
+          setTimeout(() => {
+            // If still in map, it wasn't followed by completion = real error
+            if (recentErrors.has(sessionID)) {
+              recentErrors.delete(sessionID)
+              void handleEventWithElapsedTime(client, config, "error", projectName, event)
+            }
+          }, 100)
+        } else {
+          await handleEventWithElapsedTime(client, config, "error", projectName, event)
+        }
       }
     },
     "permission.ask": async () => {
