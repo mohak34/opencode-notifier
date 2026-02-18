@@ -80,6 +80,13 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
     "subagent_complete": null,
     "error": null,
     "question": null
+  },
+  "volumes": {
+    "permission": 1,
+    "complete": 1,
+    "subagent_complete": 1,
+    "error": 1,
+    "question": 1
   }
 }
 ```
@@ -168,6 +175,26 @@ Platform notes:
 - macOS/Linux: .wav or .mp3 files work
 - Windows: Only .wav files work
 - If file doesn't exist, falls back to bundled sound
+
+### Volumes
+
+Set per-event volume from `0` to `1`:
+
+```json
+{
+  "volumes": {
+    "permission": 0.6,
+    "complete": 0.3,
+    "subagent_complete": 0.15,
+    "error": 1,
+    "question": 0.7
+  }
+}
+```
+
+- `0` = mute, `1` = full volume
+- Values outside `0..1` are clamped automatically
+- On Windows, playback still works but custom volume may not be honored by the default player
 
 ### Custom commands
 
