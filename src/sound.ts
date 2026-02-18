@@ -7,6 +7,8 @@ import type { EventType } from "./config"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DEBOUNCE_MS = 1000
+const FULL_VOLUME_PERCENT = 100
+const FULL_VOLUME_PULSE = 65536
 
 const lastSoundTime: Record<string, number> = {}
 
@@ -61,12 +63,38 @@ async function runCommand(command: string, args: string[]): Promise<void> {
   })
 }
 
-async function playOnLinux(soundPath: string): Promise<void> {
+function normalizeVolume(volume: number): number {
+  if (!Number.isFinite(volume)) {
+    return 1
+  }
+
+  if (volume < 0) {
+    return 0
+  }
+
+  if (volume > 1) {
+    return 1
+  }
+
+  return volume
+}
+
+function toPercentVolume(volume: number): number {
+  return Math.round(volume * FULL_VOLUME_PERCENT)
+}
+
+function toPulseVolume(volume: number): number {
+  return Math.round(volume * FULL_VOLUME_PULSE)
+}
+
+async function playOnLinux(soundPath: string, volume: number): Promise<void> {
+  const percentVolume = toPercentVolume(volume)
+  const pulseVolume = toPulseVolume(volume)
   const players = [
-    { command: "paplay", args: [soundPath] },
+    { command: "paplay", args: [`--volume=${pulseVolume}`, soundPath] },
     { command: "aplay", args: [soundPath] },
-    { command: "mpv", args: ["--no-video", "--no-terminal", soundPath] },
-    { command: "ffplay", args: ["-nodisp", "-autoexit", "-loglevel", "quiet", soundPath] },
+    { command: "mpv", args: ["--no-video", "--no-terminal", `--volume=${percentVolume}`, soundPath] },
+    { command: "ffplay", args: ["-nodisp", "-autoexit", "-loglevel", "quiet", "-volume", `${percentVolume}`, soundPath] },
   ]
 
   for (const player of players) {
@@ -79,8 +107,8 @@ async function playOnLinux(soundPath: string): Promise<void> {
   }
 }
 
-async function playOnMac(soundPath: string): Promise<void> {
-  await runCommand("afplay", [soundPath])
+async function playOnMac(soundPath: string, volume: number): Promise<void> {
+  await runCommand("afplay", ["-v", `${volume}`, soundPath])
 }
 
 async function playOnWindows(soundPath: string): Promise<void> {
@@ -90,7 +118,8 @@ async function playOnWindows(soundPath: string): Promise<void> {
 
 export async function playSound(
   event: EventType,
-  customPath: string | null
+  customPath: string | null,
+  volume: number
 ): Promise<void> {
   const now = Date.now()
   if (lastSoundTime[event] && now - lastSoundTime[event] < DEBOUNCE_MS) {
@@ -99,6 +128,7 @@ export async function playSound(
   lastSoundTime[event] = now
 
   const soundPath = getSoundFilePath(event, customPath)
+  const normalizedVolume = normalizeVolume(volume)
 
   if (!soundPath) {
     return
@@ -109,10 +139,10 @@ export async function playSound(
   try {
     switch (os) {
       case "darwin":
-        await playOnMac(soundPath)
+        await playOnMac(soundPath, normalizedVolume)
         break
       case "linux":
-        await playOnLinux(soundPath)
+        await playOnLinux(soundPath, normalizedVolume)
         break
       case "win32":
         await playOnWindows(soundPath)

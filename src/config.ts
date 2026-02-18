@@ -46,6 +46,13 @@ export interface NotifierConfig {
     error: string | null
     question: string | null
   }
+  volumes: {
+    permission: number
+    complete: number
+    subagent_complete: number
+    error: number
+    question: number
+  }
 }
 
 const DEFAULT_EVENT_CONFIG: EventConfig = {
@@ -86,6 +93,13 @@ const DEFAULT_CONFIG: NotifierConfig = {
     error: null,
     question: null,
   },
+  volumes: {
+    permission: 1,
+    complete: 1,
+    subagent_complete: 1,
+    error: 1,
+    question: 1,
+  },
 }
 
 function getConfigPath(): string {
@@ -111,6 +125,22 @@ function parseEventConfig(
     sound: userEvent.sound ?? defaultConfig.sound,
     notification: userEvent.notification ?? defaultConfig.notification,
   }
+}
+
+function parseVolume(value: unknown, defaultVolume: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return defaultVolume
+  }
+
+  if (value < 0) {
+    return 0
+  }
+
+  if (value > 1) {
+    return 1
+  }
+
+  return value
 }
 
 export function loadConfig(): NotifierConfig {
@@ -181,6 +211,16 @@ export function loadConfig(): NotifierConfig {
         error: userConfig.sounds?.error ?? DEFAULT_CONFIG.sounds.error,
         question: userConfig.sounds?.question ?? DEFAULT_CONFIG.sounds.question,
       },
+      volumes: {
+        permission: parseVolume(userConfig.volumes?.permission, DEFAULT_CONFIG.volumes.permission),
+        complete: parseVolume(userConfig.volumes?.complete, DEFAULT_CONFIG.volumes.complete),
+        subagent_complete: parseVolume(
+          userConfig.volumes?.subagent_complete,
+          DEFAULT_CONFIG.volumes.subagent_complete
+        ),
+        error: parseVolume(userConfig.volumes?.error, DEFAULT_CONFIG.volumes.error),
+        question: parseVolume(userConfig.volumes?.question, DEFAULT_CONFIG.volumes.question),
+      },
     }
   } catch {
     return DEFAULT_CONFIG
@@ -201,6 +241,10 @@ export function getMessage(config: NotifierConfig, event: EventType): string {
 
 export function getSoundPath(config: NotifierConfig, event: EventType): string | null {
   return config.sounds[event]
+}
+
+export function getSoundVolume(config: NotifierConfig, event: EventType): number {
+  return config.volumes[event]
 }
 
 export function getIconPath(config: NotifierConfig): string | undefined {
