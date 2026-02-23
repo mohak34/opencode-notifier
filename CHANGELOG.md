@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [0.1.27] - 2026-02-23
 
 ### Added
-- Linux notification grouping support (#33) - @hschmiedhofer
+- Linux notification grouping support (#33)
 - New `linux.grouping` config option to replace notifications in-place instead of stacking
 - Auto-detects `notify-send` 0.8+ capabilities, falls back to default behavior on older systems
 - Works with GNOME, dunst, mako, swaync on both X11 and Wayland
