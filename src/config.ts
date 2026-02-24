@@ -3,7 +3,7 @@ import { join, dirname } from "path"
 import { homedir } from "os"
 import { fileURLToPath } from "url"
 
-export type EventType = "permission" | "complete" | "subagent_complete" | "error" | "question" | "interrupted"
+export type EventType = "permission" | "complete" | "subagent_complete" | "error" | "question" | "interrupted" | "user_cancelled"
 
 export interface EventConfig {
   sound: boolean
@@ -43,6 +43,7 @@ export interface NotifierConfig {
     error: EventConfig
     question: EventConfig
     interrupted: EventConfig
+    user_cancelled: EventConfig
   }
   messages: {
     permission: string
@@ -51,6 +52,7 @@ export interface NotifierConfig {
     error: string
     question: string
     interrupted: string
+    user_cancelled: string
   }
   sounds: {
     permission: string | null
@@ -59,6 +61,7 @@ export interface NotifierConfig {
     error: string | null
     question: string | null
     interrupted: string | null
+    user_cancelled: string | null
   }
   volumes: {
     permission: number
@@ -67,6 +70,7 @@ export interface NotifierConfig {
     error: number
     question: number
     interrupted: number
+    user_cancelled: number
   }
 }
 
@@ -98,6 +102,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
     error: { ...DEFAULT_EVENT_CONFIG },
     question: { ...DEFAULT_EVENT_CONFIG },
     interrupted: { ...DEFAULT_EVENT_CONFIG },
+    user_cancelled: { sound: false, notification: false },
   },
   messages: {
     permission: "Session needs permission: {sessionTitle}",
@@ -106,6 +111,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
     error: "Session encountered an error: {sessionTitle}",
     question: "Session has a question: {sessionTitle}",
     interrupted: "Session was interrupted: {sessionTitle}",
+    user_cancelled: "Session was cancelled: {sessionTitle}",
   },
   sounds: {
     permission: null,
@@ -114,6 +120,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
     error: null,
     question: null,
     interrupted: null,
+    user_cancelled: null,
   },
   volumes: {
     permission: 1,
@@ -122,6 +129,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
     error: 1,
     question: 1,
     interrupted: 1,
+    user_cancelled: 1,
   },
 }
 
@@ -227,6 +235,7 @@ export function loadConfig(): NotifierConfig {
         error: parseEventConfig(userConfig.events?.error ?? userConfig.error, defaultWithGlobal),
         question: parseEventConfig(userConfig.events?.question ?? userConfig.question, defaultWithGlobal),
         interrupted: parseEventConfig(userConfig.events?.interrupted ?? userConfig.interrupted, defaultWithGlobal),
+        user_cancelled: parseEventConfig(userConfig.events?.user_cancelled ?? userConfig.user_cancelled, { sound: false, notification: false }),
       },
       messages: {
         permission: userConfig.messages?.permission ?? DEFAULT_CONFIG.messages.permission,
@@ -235,6 +244,7 @@ export function loadConfig(): NotifierConfig {
         error: userConfig.messages?.error ?? DEFAULT_CONFIG.messages.error,
         question: userConfig.messages?.question ?? DEFAULT_CONFIG.messages.question,
         interrupted: userConfig.messages?.interrupted ?? DEFAULT_CONFIG.messages.interrupted,
+        user_cancelled: userConfig.messages?.user_cancelled ?? DEFAULT_CONFIG.messages.user_cancelled,
       },
       sounds: {
         permission: userConfig.sounds?.permission ?? DEFAULT_CONFIG.sounds.permission,
@@ -243,6 +253,7 @@ export function loadConfig(): NotifierConfig {
         error: userConfig.sounds?.error ?? DEFAULT_CONFIG.sounds.error,
         question: userConfig.sounds?.question ?? DEFAULT_CONFIG.sounds.question,
         interrupted: userConfig.sounds?.interrupted ?? DEFAULT_CONFIG.sounds.interrupted,
+        user_cancelled: userConfig.sounds?.user_cancelled ?? DEFAULT_CONFIG.sounds.user_cancelled,
       },
       volumes: {
         permission: parseVolume(userConfig.volumes?.permission, DEFAULT_CONFIG.volumes.permission),
@@ -254,6 +265,7 @@ export function loadConfig(): NotifierConfig {
         error: parseVolume(userConfig.volumes?.error, DEFAULT_CONFIG.volumes.error),
         question: parseVolume(userConfig.volumes?.question, DEFAULT_CONFIG.volumes.question),
         interrupted: parseVolume(userConfig.volumes?.interrupted, DEFAULT_CONFIG.volumes.interrupted),
+        user_cancelled: parseVolume(userConfig.volumes?.user_cancelled, DEFAULT_CONFIG.volumes.user_cancelled),
       },
     }
   } catch {

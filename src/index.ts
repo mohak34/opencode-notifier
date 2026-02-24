@@ -164,6 +164,24 @@ function shouldSuppressSessionIdle(sessionID: string, consume: boolean = true): 
   return true
 }
 
+function isUserCancelledError(event: unknown): boolean {
+  const errorType = (event as any)?.properties?.error?.type
+  const errorMessage = (event as any)?.properties?.error?.message
+  
+  const cancellationTypes = ["user_cancelled", "cancelled", "interrupted", "abort"]
+  const cancellationMessages = ["user cancelled", "cancelled by user", "operation cancelled", "aborted"]
+  
+  if (errorType && cancellationTypes.some(t => errorType.toLowerCase().includes(t))) {
+    return true
+  }
+  
+  if (errorMessage && cancellationMessages.some(m => errorMessage.toLowerCase().includes(m))) {
+    return true
+  }
+  
+  return false
+}
+
 async function getElapsedSinceLastPrompt(
   client: PluginInput["client"],
   sessionID: string,
@@ -332,12 +350,15 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
       if (event.type === "session.error") {
         const sessionID = getSessionIDFromEvent(event)
         markSessionError(sessionID)
+        
+        const eventType = isUserCancelledError(event) ? "user_cancelled" : "error"
+        
         let sessionTitle: string | null = null
         if (sessionID && config.showSessionTitle) {
           const info = await getSessionInfo(client, sessionID)
           sessionTitle = info.title
         }
-        await handleEventWithElapsedTime(client, config, "error", projectName, event, undefined, sessionTitle)
+        await handleEventWithElapsedTime(client, config, eventType, projectName, event, undefined, sessionTitle)
       }
     },
     "permission.ask": async () => {
