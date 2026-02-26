@@ -33,7 +33,7 @@ export interface NotifierConfig {
   showProjectName: boolean
   showSessionTitle: boolean
   showIcon: boolean
-  notificationSystem: "osascript" | "node-notifier"
+  notificationSystem: "osascript" | "node-notifier" | "ghostty"
   linux: LinuxConfig
   command: CommandConfig
   events: {
@@ -82,7 +82,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
   showProjectName: true,
   showSessionTitle: false,
   showIcon: true,
-  notificationSystem: "osascript",
+  notificationSystem: "osascript" as const,
   linux: {
     grouping: false,
   },
@@ -210,7 +210,12 @@ export function loadConfig(): NotifierConfig {
       showProjectName: userConfig.showProjectName ?? DEFAULT_CONFIG.showProjectName,
       showSessionTitle: userConfig.showSessionTitle ?? DEFAULT_CONFIG.showSessionTitle,
       showIcon: userConfig.showIcon ?? DEFAULT_CONFIG.showIcon,
-      notificationSystem: userConfig.notificationSystem === "node-notifier" ? "node-notifier" : "osascript",
+      notificationSystem:
+        userConfig.notificationSystem === "node-notifier"
+          ? "node-notifier"
+          : userConfig.notificationSystem === "ghostty"
+            ? "ghostty"
+            : "osascript",
       linux: {
         grouping: typeof userConfig.linux?.grouping === "boolean" ? userConfig.linux.grouping : DEFAULT_CONFIG.linux.grouping,
       },
