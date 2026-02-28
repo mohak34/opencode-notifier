@@ -22,7 +22,7 @@ You'll get notified when:
 - An error happens  
 - The question tool pops up
 
-There's also `subagent_complete` for when subagents finish, but that's silent by default so you don't get spammed.
+There's also `subagent_complete` for when subagents finish, and `user_cancelled` for when you press ESC to abort -- both are silent by default so you don't get spammed.
 
 ## Setup by platform
 
@@ -69,28 +69,32 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
     "complete": { "sound": true, "notification": true },
     "subagent_complete": { "sound": false, "notification": false },
     "error": { "sound": true, "notification": true },
-    "question": { "sound": true, "notification": true }
+    "question": { "sound": true, "notification": true },
+    "user_cancelled": { "sound": false, "notification": false }
   },
   "messages": {
     "permission": "Session needs permission: {sessionTitle}",
     "complete": "Session has finished: {sessionTitle}",
     "subagent_complete": "Subagent task completed: {sessionTitle}",
     "error": "Session encountered an error: {sessionTitle}",
-    "question": "Session has a question: {sessionTitle}"
+    "question": "Session has a question: {sessionTitle}",
+    "user_cancelled": "Session was cancelled by user: {sessionTitle}"
   },
   "sounds": {
     "permission": null,
     "complete": null,
     "subagent_complete": null,
     "error": null,
-    "question": null
+    "question": null,
+    "user_cancelled": null
   },
   "volumes": {
     "permission": 1,
     "complete": 1,
     "subagent_complete": 1,
     "error": 1,
-    "question": 1
+    "question": 1,
+    "user_cancelled": 1
   }
 }
 ```
@@ -131,10 +135,13 @@ Control each event separately:
     "complete": { "sound": true, "notification": true },
     "subagent_complete": { "sound": false, "notification": false },
     "error": { "sound": true, "notification": true },
-    "question": { "sound": true, "notification": true }
+    "question": { "sound": true, "notification": true },
+    "user_cancelled": { "sound": false, "notification": false }
   }
 }
 ```
+
+`user_cancelled` fires when you press ESC to abort a session. It's silent by default so intentional cancellations don't trigger error alerts. Set `sound` or `notification` to `true` if you want confirmation when cancelling.
 
 Or use true/false for both:
 
@@ -157,7 +164,8 @@ Customize the notification text:
     "complete": "Session has finished: {sessionTitle}",
     "subagent_complete": "Subagent task completed: {sessionTitle}",
     "error": "Session encountered an error: {sessionTitle}",
-    "question": "Session has a question: {sessionTitle}"
+    "question": "Session has a question: {sessionTitle}",
+    "user_cancelled": "Session was cancelled by user: {sessionTitle}"
   }
 }
 ```
@@ -182,7 +190,8 @@ Use your own sound files:
     "complete": "/path/to/done.wav",
     "subagent_complete": "/path/to/subagent-done.wav",
     "error": "/path/to/error.wav",
-    "question": "/path/to/question.wav"
+    "question": "/path/to/question.wav",
+    "user_cancelled": "/path/to/cancelled.wav"
   }
 }
 ```
@@ -203,7 +212,8 @@ Set per-event volume from `0` to `1`:
     "complete": 0.3,
     "subagent_complete": 0.15,
     "error": 1,
-    "question": 0.7
+    "question": 0.7,
+    "user_cancelled": 0.5
   }
 }
 ```
