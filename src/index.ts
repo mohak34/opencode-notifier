@@ -164,10 +164,6 @@ function shouldSuppressSessionIdle(sessionID: string, consume: boolean = true): 
   return true
 }
 
-function isUserCancelledError(event: unknown): boolean {
-  return (event as any)?.properties?.error?.name === "MessageAbortedError"
-}
-
 async function getElapsedSinceLastPrompt(
   client: PluginInput["client"],
   sessionID: string,
@@ -334,12 +330,9 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
       }
 
       if (event.type === "session.error") {
-
         const sessionID = getSessionIDFromEvent(event)
         markSessionError(sessionID)
-        
-        const eventType = isUserCancelledError(event) ? "user_cancelled" : "error"
-        
+        const eventType: EventType = event.properties.error?.name === "MessageAbortedError" ? "user_cancelled" : "error"
         let sessionTitle: string | null = null
         if (sessionID && config.showSessionTitle) {
           const info = await getSessionInfo(client, sessionID)

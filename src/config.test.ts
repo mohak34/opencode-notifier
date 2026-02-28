@@ -114,6 +114,48 @@ describe("Config", () => {
     expect(isEventNotificationEnabled(config, "error")).toBe(false)
   })
 
+  test("loadConfig defaults user_cancelled to silent", async () => {
+    const { loadConfig, isEventSoundEnabled, isEventNotificationEnabled } = await import("./config")
+    const config = loadConfig()
+
+    expect(isEventSoundEnabled(config, "user_cancelled")).toBe(false)
+    expect(isEventNotificationEnabled(config, "user_cancelled")).toBe(false)
+    expect(config.messages.user_cancelled).toBe("Session was cancelled by user: {sessionTitle}")
+  })
+
+  test("loadConfig parses user_cancelled event config from file", async () => {
+    const testConfig = {
+      events: {
+        user_cancelled: { sound: true, notification: true },
+      },
+      messages: {
+        user_cancelled: "Cancelled: {sessionTitle}",
+      },
+    }
+    writeFileSync(testConfigPath, JSON.stringify(testConfig))
+
+    const { loadConfig, isEventSoundEnabled, isEventNotificationEnabled } = await import("./config")
+    const config = loadConfig()
+
+    expect(isEventSoundEnabled(config, "user_cancelled")).toBe(true)
+    expect(isEventNotificationEnabled(config, "user_cancelled")).toBe(true)
+    expect(config.messages.user_cancelled).toBe("Cancelled: {sessionTitle}")
+  })
+
+  test("loadConfig keeps user_cancelled silent when global sound/notification are set", async () => {
+    const testConfig = {
+      sound: true,
+      notification: true,
+    }
+    writeFileSync(testConfigPath, JSON.stringify(testConfig))
+
+    const { loadConfig, isEventSoundEnabled, isEventNotificationEnabled } = await import("./config")
+    const config = loadConfig()
+
+    expect(isEventSoundEnabled(config, "user_cancelled")).toBe(false)
+    expect(isEventNotificationEnabled(config, "user_cancelled")).toBe(false)
+  })
+
   test("saveConfig writes config to file", async () => {
     const { loadConfig, saveConfig } = await import("./config")
     const config = loadConfig()
