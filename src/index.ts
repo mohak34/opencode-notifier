@@ -15,6 +15,7 @@ import type { EventType, NotifierConfig } from "./config"
 import { sendNotification } from "./notify"
 import { playSound } from "./sound"
 import { runCommand } from "./command"
+import { isTerminalFocused } from "./focus"
 
 const IDLE_COMPLETE_DELAY_MS = 350
 
@@ -87,6 +88,10 @@ async function handleEvent(
   sessionTitle?: string | null,
   sessionID?: string | null
 ): Promise<void> {
+  if (config.suppressWhenFocused && isTerminalFocused()) {
+    return
+  }
+
   const promises: Promise<void>[] = []
 
   const timestamp = formatTimestamp()

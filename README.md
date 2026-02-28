@@ -54,6 +54,7 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
   "showProjectName": true,
   "showSessionTitle": false,
   "showIcon": true,
+  "suppressWhenFocused": true,
   "notificationSystem": "osascript",
   "linux": {
     "grouping": false
@@ -121,6 +122,7 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
 - `showProjectName` - Show folder name in notification title (default: true)
 - `showSessionTitle` - Include the session title in notification messages via `{sessionTitle}` placeholder (default: true)
 - `showIcon` - Show OpenCode icon, Windows/Linux only (default: true)
+- `suppressWhenFocused` - Skip notifications and sounds when the terminal is the active window (default: true). See [Focus detection](#focus-detection) for platform details
 - `notificationSystem` - macOS only: `"osascript"` or `"node-notifier"` (default: "osascript")
 - `linux.grouping` - Linux only: replace notifications in-place instead of stacking (default: false). Requires `notify-send` 0.8+
 
@@ -280,6 +282,32 @@ Run your own script when something happens. Use `{event}`, `{message}`, and `{se
 ```
 
 **NOTE:** If you go with node-notifier and start missing notifications, just switch back or remove the option from the config. Users have reported issues with using node-notifier for receiving only sounds and no notification popups.
+
+## Focus detection
+
+When `suppressWhenFocused` is `true` (the default), notifications and sounds are skipped if the terminal running OpenCode is the active/focused window. The idea is simple: if you're already looking at it, you don't need an alert.
+
+To disable this and always get notified:
+
+```json
+{
+  "suppressWhenFocused": false
+}
+```
+
+### Platform support
+
+| Platform | Method | Requirements |
+|----------|--------|--------------|
+| macOS | AppleScript (`System Events`) | None |
+| Linux X11 | `xdotool` | `xdotool` installed |
+| Linux Wayland (Hyprland) | `hyprctl activewindow` | None |
+| Linux Wayland (Sway) | `swaymsg -t get_tree` | None |
+| Linux Wayland (KDE) | `kdotool` | `kdotool` installed |
+| Linux Wayland (GNOME) | Not supported | Falls back to always notifying |
+| Windows | `GetForegroundWindow()` via PowerShell | None |
+
+If detection fails for any reason (missing tools, unknown compositor, permissions), it falls back to always notifying. It never silently eats your notifications.
 
 ## Linux: Notification Grouping
 
