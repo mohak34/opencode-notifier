@@ -72,24 +72,47 @@ function isMacOSFocused(terminal: TerminalInfo): boolean {
   )
 }
 
-function isPidAncestorOfCurrentProcess(pid: number): boolean {
-  let currentPid = process.pid
+function getParentPid(pid: number): number | null {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf-8")
+    const closingParen = stat.lastIndexOf(")")
+    if (closingParen === -1) return null
+    const fields = stat.slice(closingParen + 2).split(" ")
+    const ppid = parseInt(fields[1], 10)
+    return Number.isFinite(ppid) ? ppid : null
+  } catch {
+    return null
+  }
+}
+
+function getProcessTreeRoot(): number {
+  if (process.env.TMUX) {
+    const clientPidStr = execWithTimeout("tmux display-message -p '#{client_pid}'")
+    if (clientPidStr) {
+      const clientPid = parseInt(clientPidStr, 10)
+      if (Number.isFinite(clientPid) && clientPid > 0) return clientPid
+    }
+  }
+  return process.pid
+}
+
+function isPidAncestorOfProcess(targetPid: number, startPid: number): boolean {
+  let currentPid = startPid
 
   for (let depth = 0; depth < 20; depth++) {
-    if (currentPid === pid) return true
+    if (currentPid === targetPid) return true
     if (currentPid <= 1) return false
 
-    try {
-      const stat = readFileSync(`/proc/${currentPid}/stat`, "utf-8")
-      const match = stat.match(/^\d+\s+\(.*?\)\s+\S+\s+(\d+)/)
-      if (!match) return false
-      currentPid = parseInt(match[1], 10)
-    } catch {
-      return false
-    }
+    const ppid = getParentPid(currentPid)
+    if (ppid === null) return false
+    currentPid = ppid
   }
 
   return false
+}
+
+function isFocusedWindowOurs(windowPid: number): boolean {
+  return isPidAncestorOfProcess(windowPid, getProcessTreeRoot())
 }
 
 function isLinuxX11Focused(): boolean {
@@ -99,7 +122,7 @@ function isLinuxX11Focused(): boolean {
   const pid = parseInt(pidStr, 10)
   if (!Number.isFinite(pid) || pid <= 0) return false
 
-  return isPidAncestorOfCurrentProcess(pid)
+  return isFocusedWindowOurs(pid)
 }
 
 function isHyprlandFocused(): boolean {
@@ -110,7 +133,7 @@ function isHyprlandFocused(): boolean {
     const data = JSON.parse(output)
     const pid = data?.pid
     if (typeof pid !== "number" || pid <= 0) return false
-    return isPidAncestorOfCurrentProcess(pid)
+    return isFocusedWindowOurs(pid)
   } catch {
     return false
   }
@@ -124,7 +147,7 @@ function isSwayFocused(): boolean {
     const tree = JSON.parse(output)
     const pid = findFocusedPid(tree)
     if (pid === null) return false
-    return isPidAncestorOfCurrentProcess(pid)
+    return isFocusedWindowOurs(pid)
   } catch {
     return false
   }
@@ -162,7 +185,7 @@ function isKDEWaylandFocused(): boolean {
   const pid = parseInt(pidStr, 10)
   if (!Number.isFinite(pid) || pid <= 0) return false
 
-  return isPidAncestorOfCurrentProcess(pid)
+  return isFocusedWindowOurs(pid)
 }
 
 function isLinuxWaylandFocused(): boolean {
@@ -205,7 +228,8 @@ Write-Output $pid
   const pid = parseInt(pidStr, 10)
   if (!Number.isFinite(pid) || pid <= 0) return false
 
-  let currentPid = process.pid
+  const startPid = getProcessTreeRoot()
+  let currentPid = startPid
   for (let depth = 0; depth < 20; depth++) {
     if (currentPid === pid) return true
     if (currentPid <= 1) return false
