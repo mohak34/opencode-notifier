@@ -24,6 +24,8 @@ export interface LinuxConfig {
 export interface MessageContext {
   sessionTitle?: string | null
   projectName?: string | null
+  timestamp?: string | null
+  turn?: number | null
 }
 
 export interface NotifierConfig {
@@ -327,10 +329,13 @@ export function interpolateMessage(message: string, context: MessageContext): st
   const projectName = context.projectName || ""
   result = result.replaceAll("{projectName}", projectName)
 
-  // Clean up artifacts from empty placeholder replacements
-  // Remove trailing separators like ": ", " - ", " | " left after empty substitution
+  const timestamp = context.timestamp || ""
+  result = result.replaceAll("{timestamp}", timestamp)
+
+  const turn = context.turn != null ? String(context.turn) : ""
+  result = result.replaceAll("{turn}", turn)
+
   result = result.replace(/\s*[:\-|]\s*$/, "").trim()
-  // Collapse multiple spaces into one
   result = result.replace(/\s{2,}/g, " ")
 
   return result

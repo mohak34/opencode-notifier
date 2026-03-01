@@ -155,4 +155,24 @@ describe("Config", () => {
     expect(isEventSoundEnabled(config, "user_cancelled")).toBe(false)
     expect(isEventNotificationEnabled(config, "user_cancelled")).toBe(false)
   })
+
+  test("interpolateMessage substitutes {timestamp} placeholder", async () => {
+    const { interpolateMessage } = await import("./config")
+    const result = interpolateMessage("Event at {timestamp}", { timestamp: "14:30:05" })
+
+    expect(result).toBe("Event at 14:30:05")
+  })
+
+  test("interpolateMessage substitutes {turn} placeholder", async () => {
+    const { interpolateMessage } = await import("./config")
+    const result = interpolateMessage("Question {turn}: {sessionTitle}", { sessionTitle: "Fix bug", turn: 3 })
+
+    expect(result).toBe("Question 3: Fix bug")
+  })
+  test("interpolateMessage cleans up empty {timestamp} and {turn}", async () => {
+    const { interpolateMessage } = await import("./config")
+    const result = interpolateMessage("Event {turn} at {timestamp}", {})
+
+    expect(result).toBe("Event at")
+  })
 })

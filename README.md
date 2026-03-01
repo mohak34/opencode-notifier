@@ -174,10 +174,14 @@ Messages support placeholder tokens that get replaced with actual values:
 
 - `{sessionTitle}` - The title/summary of the current session (e.g. "Fix login bug")
 - `{projectName}` - The project folder name
+- `{timestamp}` - Current time in `HH:MM:SS` format (e.g. "14:30:05")
+- `{turn}` - Notification counter for the session, increments with each notification (e.g. 1, 2, 3)
 
 When `showSessionTitle` is `false`, `{sessionTitle}` is replaced with an empty string. Any trailing separators (`: `, ` - `, ` | `) are automatically cleaned up when a placeholder resolves to empty.
 
 To disable session titles in messages without changing `showSessionTitle`, just remove the `{sessionTitle}` placeholder from your custom messages.
+
+The `{timestamp}` and `{turn}` placeholders also work in custom command args.
 
 ### Sounds
 
