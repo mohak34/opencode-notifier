@@ -96,8 +96,8 @@ export async function sendNotification(
 
   if (notificationSystem === "ghostty") {
     return new Promise((resolve) => {
-      const escapedTitle = title.replace(/[;\x07\x1b]/g, "")
-      const escapedMessage = message.replace(/[;\x07\x1b]/g, "")
+      const escapedTitle = title.replace(/[;\x07\x1b\n\r]/g, "")
+      const escapedMessage = message.replace(/[;\x07\x1b\n\r]/g, "")
       process.stdout.write(`\x1b]777;notify;${escapedTitle};${escapedMessage}\x07`, () => {
         resolve()
       })

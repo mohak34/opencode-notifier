@@ -86,7 +86,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
   showProjectName: true,
   showSessionTitle: false,
   showIcon: true,
-  notificationSystem: "osascript" as const,
+  notificationSystem: "osascript",
   linux: {
     grouping: false,
   },

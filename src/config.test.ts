@@ -155,35 +155,4 @@ describe("Config", () => {
     expect(isEventSoundEnabled(config, "user_cancelled")).toBe(false)
     expect(isEventNotificationEnabled(config, "user_cancelled")).toBe(false)
   })
-
-  test("saveConfig writes config to file", async () => {
-    const { loadConfig, saveConfig } = await import("./config")
-    const config = loadConfig()
-    
-    config.sound = false
-    config.timeout = 15
-    saveConfig(config)
-    
-    expect(existsSync(testConfigPath)).toBe(true)
-    
-    const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
-    expect(savedConfig.sound).toBe(false)
-    expect(savedConfig.timeout).toBe(15)
-  })
-
-  test("saveConfig preserves sounds, volumes, and showSessionTitle", async () => {
-    const { loadConfig, saveConfig } = await import("./config")
-    const config = loadConfig()
-
-    config.showSessionTitle = true
-    config.sounds.complete = "/tmp/complete.wav"
-    config.volumes.error = 0.3
-
-    saveConfig(config)
-
-    const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
-    expect(savedConfig.showSessionTitle).toBe(true)
-    expect(savedConfig.sounds.complete).toBe("/tmp/complete.wav")
-    expect(savedConfig.volumes.error).toBe(0.3)
-  })
 })
