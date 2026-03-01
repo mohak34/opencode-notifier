@@ -297,17 +297,24 @@ To disable this and always get notified:
 
 ### Platform support
 
-| Platform | Method | Requirements |
-|----------|--------|--------------|
-| macOS | AppleScript (`System Events`) | None |
-| Linux X11 | `xdotool` | `xdotool` installed |
-| Linux Wayland (Hyprland) | `hyprctl activewindow` | None |
-| Linux Wayland (Sway) | `swaymsg -t get_tree` | None |
-| Linux Wayland (KDE) | `kdotool` | `kdotool` installed |
-| Linux Wayland (GNOME) | Not supported | Falls back to always notifying |
-| Windows | `GetForegroundWindow()` via PowerShell | None |
+| Platform | Method | Requirements | Status |
+|----------|--------|--------------|--------|
+| macOS | AppleScript (`System Events`) | None | Untested |
+| Linux X11 | `xdotool` | `xdotool` installed | Untested |
+| Linux Wayland (Hyprland) | `hyprctl activewindow` | None | Tested |
+| Linux Wayland (Sway) | `swaymsg -t get_tree` | None | Untested |
+| Linux Wayland (KDE) | `kdotool` | `kdotool` installed | Untested |
+| Linux Wayland (GNOME) | Not supported | - | Falls back to always notifying |
+| Linux Wayland (Niri, river, dwl, Cosmic, etc.) | Not supported | - | Falls back to always notifying |
+| Windows | `GetForegroundWindow()` via PowerShell | None | Untested |
 
-If detection fails for any reason (missing tools, unknown compositor, permissions), it falls back to always notifying. It never silently eats your notifications.
+**Unsupported compositors**: Wayland has no standard protocol for querying the focused window. Each compositor has its own IPC, and GNOME intentionally doesn't expose focus information. Unsupported compositors fall back to always notifying.
+
+**tmux/screen**: When running inside tmux, the tmux server daemonizes and detaches from the terminal's process tree. The plugin handles this by querying the tmux client PID and walking from there. GNU Screen has the same issue but is not currently handled (falls back to always notifying).
+
+**Fail-open design**: If detection fails for any reason (missing tools, unknown compositor, permissions), it falls back to always notifying. It never silently eats your notifications.
+
+If you test on a platform marked "Untested" and it works (or doesn't), please open an issue and let us know.
 
 ## Linux: Notification Grouping
 
