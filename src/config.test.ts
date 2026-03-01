@@ -194,4 +194,11 @@ describe("Config", () => {
 
     expect(result).toBe("Event at")
   })
+
+  test("getStatePath returns path next to config file", async () => {
+    const { getStatePath } = await import("./config")
+    const statePath = getStatePath()
+
+    expect(statePath).toEndWith("opencode-notifier-state.json")
+  })
 })

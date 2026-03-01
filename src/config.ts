@@ -144,6 +144,11 @@ export function getConfigPath(): string {
   return join(homedir(), ".config", "opencode", "opencode-notifier.json")
 }
 
+export function getStatePath(): string {
+  const configPath = getConfigPath()
+  return join(dirname(configPath), "opencode-notifier-state.json")
+}
+
 function parseEventConfig(
   userEvent: boolean | { sound?: boolean; notification?: boolean } | undefined,
   defaultConfig: EventConfig

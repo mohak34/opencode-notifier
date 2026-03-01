@@ -1,6 +1,7 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin"
 import { tool } from "@opencode-ai/plugin"
 import { basename } from "path"
+import { readFileSync, writeFileSync } from "fs"
 import {
   loadConfig,
   isEventSoundEnabled,
@@ -10,6 +11,7 @@ import {
   getSoundVolume,
   getIconPath,
   interpolateMessage,
+  getStatePath,
 } from "./config"
 import type { EventType, NotifierConfig } from "./config"
 import { sendNotification } from "./notify"
@@ -23,7 +25,34 @@ const pendingIdleTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const sessionIdleSequence = new Map<string, number>()
 const sessionErrorSuppressionAt = new Map<string, number>()
 const sessionLastBusyAt = new Map<string, number>()
-const sessionTurnCount = new Map<string, number>()
+
+let globalTurnCount: number | null = null
+
+function loadTurnCount(): number {
+  try {
+    const content = readFileSync(getStatePath(), "utf-8")
+    const state = JSON.parse(content)
+    if (typeof state.turn === "number" && Number.isFinite(state.turn) && state.turn >= 0) {
+      return state.turn
+    }
+  } catch {}
+  return 0
+}
+
+function saveTurnCount(count: number): void {
+  try {
+    writeFileSync(getStatePath(), JSON.stringify({ turn: count }))
+  } catch {}
+}
+
+function incrementTurnCount(): number {
+  if (globalTurnCount === null) {
+    globalTurnCount = loadTurnCount()
+  }
+  globalTurnCount++
+  saveTurnCount(globalTurnCount)
+  return globalTurnCount
+}
 
 // Memory cleanup: Remove old session entries every 5 minutes to prevent leaks
 setInterval(() => {
@@ -50,12 +79,6 @@ setInterval(() => {
       sessionLastBusyAt.delete(sessionID)
     }
   }
-
-  for (const [sessionID] of sessionTurnCount) {
-    if (!pendingIdleTimers.has(sessionID) && !sessionLastBusyAt.has(sessionID)) {
-      sessionTurnCount.delete(sessionID)
-    }
-  }
 }, 5 * 60 * 1000)
 
 function getNotificationTitle(config: NotifierConfig, projectName: string | null): string {
@@ -73,13 +96,6 @@ function formatTimestamp(): string {
   return `${h}:${m}:${s}`
 }
 
-function incrementSessionTurn(sessionID: string | null): number {
-  if (!sessionID) return 1
-  const next = (sessionTurnCount.get(sessionID) ?? 0) + 1
-  sessionTurnCount.set(sessionID, next)
-  return next
-}
-
 async function handleEvent(
   config: NotifierConfig,
   eventType: EventType,
@@ -95,7 +111,7 @@ async function handleEvent(
   const promises: Promise<void>[] = []
 
   const timestamp = formatTimestamp()
-  const turn = incrementSessionTurn(sessionID ?? null)
+  const turn = incrementTurnCount()
 
   const rawMessage = getMessage(config, eventType)
   const message = interpolateMessage(rawMessage, {
