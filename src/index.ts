@@ -22,6 +22,7 @@ const pendingIdleTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const sessionIdleSequence = new Map<string, number>()
 const sessionErrorSuppressionAt = new Map<string, number>()
 const sessionLastBusyAt = new Map<string, number>()
+const sessionTurnCount = new Map<string, number>()
 
 // Memory cleanup: Remove old session entries every 5 minutes to prevent leaks
 setInterval(() => {
@@ -48,6 +49,12 @@ setInterval(() => {
       sessionLastBusyAt.delete(sessionID)
     }
   }
+
+  for (const [sessionID] of sessionTurnCount) {
+    if (!pendingIdleTimers.has(sessionID) && !sessionLastBusyAt.has(sessionID)) {
+      sessionTurnCount.delete(sessionID)
+    }
+  }
 }, 5 * 60 * 1000)
 
 function getNotificationTitle(config: NotifierConfig, projectName: string | null): string {
@@ -57,19 +64,40 @@ function getNotificationTitle(config: NotifierConfig, projectName: string | null
   return "OpenCode"
 }
 
+function formatTimestamp(): string {
+  const now = new Date()
+  const h = String(now.getHours()).padStart(2, "0")
+  const m = String(now.getMinutes()).padStart(2, "0")
+  const s = String(now.getSeconds()).padStart(2, "0")
+  return `${h}:${m}:${s}`
+}
+
+function incrementSessionTurn(sessionID: string | null): number {
+  if (!sessionID) return 1
+  const next = (sessionTurnCount.get(sessionID) ?? 0) + 1
+  sessionTurnCount.set(sessionID, next)
+  return next
+}
+
 async function handleEvent(
   config: NotifierConfig,
   eventType: EventType,
   projectName: string | null,
   elapsedSeconds?: number | null,
-  sessionTitle?: string | null
+  sessionTitle?: string | null,
+  sessionID?: string | null
 ): Promise<void> {
   const promises: Promise<void>[] = []
+
+  const timestamp = formatTimestamp()
+  const turn = incrementSessionTurn(sessionID ?? null)
 
   const rawMessage = getMessage(config, eventType)
   const message = interpolateMessage(rawMessage, {
     sessionTitle: config.showSessionTitle ? sessionTitle : null,
     projectName,
+    timestamp,
+    turn,
   })
 
   if (isEventNotificationEnabled(config, eventType)) {
@@ -94,7 +122,7 @@ async function handleEvent(
     elapsedSeconds < minDuration
 
   if (!shouldSkipCommand) {
-    runCommand(config, eventType, message, sessionTitle, projectName)
+    runCommand(config, eventType, message, sessionTitle, projectName, timestamp, turn)
   }
 
   await Promise.allSettled(promises)
@@ -298,7 +326,7 @@ async function handleEventWithElapsedTime(
     sessionTitle = info.title
   }
 
-  await handleEvent(config, eventType, projectName, elapsedSeconds, sessionTitle)
+  await handleEvent(config, eventType, projectName, elapsedSeconds, sessionTitle, sessionID)
 }
 
 export const NotifierPlugin: Plugin = async ({ client, directory }) => {
