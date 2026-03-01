@@ -85,7 +85,7 @@ export async function sendNotification(
   message: string,
   timeout: number,
   iconPath?: string,
-  notificationSystem: "osascript" | "node-notifier" = "osascript",
+  notificationSystem: "osascript" | "node-notifier" | "ghostty" = "osascript",
   linuxGrouping: boolean = true
 ): Promise<void> {
   const now = Date.now()
@@ -93,6 +93,16 @@ export async function sendNotification(
     return
   }
   lastNotificationTime[message] = now
+
+  if (notificationSystem === "ghostty") {
+    return new Promise((resolve) => {
+      const escapedTitle = title.replace(/[;\x07\x1b]/g, "")
+      const escapedMessage = message.replace(/[;\x07\x1b]/g, "")
+      process.stdout.write(`\x1b]777;notify;${escapedTitle};${escapedMessage}\x07`, () => {
+        resolve()
+      })
+    })
+  }
 
   if (platform === "Darwin") {
     if (notificationSystem === "node-notifier") {
