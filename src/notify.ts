@@ -98,7 +98,7 @@ export async function sendNotification(
     return new Promise((resolve) => {
       const escapedTitle = title.replace(/[;\x07\x1b\n\r]/g, "")
       const escapedMessage = message.replace(/[;\x07\x1b\n\r]/g, "")
-      process.stdout.write(`\x1b]777;notify;${escapedTitle};${escapedMessage}\x07`, () => {
+      process.stdout.write(`\x1b]9;${escapedTitle}: ${escapedMessage}\x07`, () => {
         resolve()
       })
     })
