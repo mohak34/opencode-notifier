@@ -285,7 +285,7 @@ Run your own script when something happens. Use `{event}`, `{message}`, `{sessio
 
 ## Ghostty notifications
 
-If you're using [Ghostty](https://ghostty.org/) terminal, you can use its native notification system via OSC 777 escape sequences:
+If you're using [Ghostty](https://ghostty.org/) terminal, you can use its native notification system via [OSC 9](https://ghostty.org/docs/vt/osc/9) escape sequences:
 
 ```json
 {
