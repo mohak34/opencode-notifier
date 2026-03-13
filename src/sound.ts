@@ -93,7 +93,7 @@ async function playOnLinux(soundPath: string, volume: number): Promise<void> {
   const players = [
     { command: "paplay", args: [`--volume=${pulseVolume}`, soundPath] },
     { command: "aplay", args: [soundPath] },
-    { command: "mpv", args: ["--no-video", "--no-terminal", `--volume=${percentVolume}`, soundPath] },
+    { command: "mpv", args: ["--no-video", "--no-terminal", "--script-opts=autoload-disabled=yes", `--volume=${percentVolume}`, soundPath] },
     { command: "ffplay", args: ["-nodisp", "-autoexit", "-loglevel", "quiet", "-volume", `${percentVolume}`, soundPath] },
   ]
 
