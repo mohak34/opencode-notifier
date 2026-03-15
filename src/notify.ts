@@ -23,6 +23,48 @@ const lastNotificationTime: Record<string, number> = {}
 let lastLinuxNotificationId: number | null = null
 let linuxNotifySendSupportsReplace: boolean | null = null
 
+type NotificationEventType =
+  | "permission"
+  | "complete"
+  | "subagent_complete"
+  | "error"
+  | "question"
+  | "interrupted"
+  | "user_cancelled"
+
+function getLinuxUrgency(eventType?: NotificationEventType): "low" | "normal" | "critical" {
+  switch (eventType) {
+    case "error":
+      return "critical"
+    case "user_cancelled":
+      return "low"
+    default:
+      return "normal"
+  }
+}
+
+function getLinuxCategory(eventType?: NotificationEventType): string {
+  switch (eventType) {
+    case "error":
+      return "im.error"
+    case "permission":
+    case "question":
+      return "im.received"
+    case "complete":
+    case "subagent_complete":
+      return "transfer.complete"
+    case "interrupted":
+    case "user_cancelled":
+      return "transfer.warning"
+    default:
+      return "im"
+  }
+}
+
+function getLinuxStackTag(eventType?: NotificationEventType): string {
+  return eventType ? `opencode-${eventType}` : "opencode"
+}
+
 function detectNotifySendCapabilities(): Promise<boolean> {
   return new Promise((resolve) => {
     execFile("notify-send", ["--version"], (error, stdout) => {
@@ -47,16 +89,26 @@ function sendLinuxNotificationDirect(
   message: string,
   timeout: number,
   iconPath?: string,
-  grouping: boolean = true
-): Promise<void> {
+  grouping: boolean = true,
+  eventType?: NotificationEventType
+): Promise<boolean> {
   return new Promise((resolve) => {
     const args: string[] = []
+    const urgency = getLinuxUrgency(eventType)
 
     if (iconPath) {
       args.push("--icon", iconPath)
     }
 
     args.push("--expire-time", String(timeout * 1000))
+    args.push("--urgency", urgency)
+    args.push("--app-name", "OpenCode")
+    args.push("--category", getLinuxCategory(eventType))
+
+    const stackTag = getLinuxStackTag(eventType)
+    args.push("--hint", "string:desktop-entry:opencode")
+    args.push("--hint", `string:x-canonical-private-synchronous:${stackTag}`)
+    args.push("--hint", `string:x-dunst-stack-tag:${stackTag}`)
 
     if (grouping && lastLinuxNotificationId !== null) {
       args.push("--replace-id", String(lastLinuxNotificationId))
@@ -69,13 +121,18 @@ function sendLinuxNotificationDirect(
     args.push("--", title, message)
 
     execFile("notify-send", args, (error, stdout) => {
-      if (!error && grouping && stdout) {
+      if (error) {
+        resolve(false)
+        return
+      }
+
+      if (grouping && stdout) {
         const id = parseInt(stdout.trim(), 10)
         if (!isNaN(id)) {
           lastLinuxNotificationId = id
         }
       }
-      resolve()
+      resolve(true)
     })
   })
 }
@@ -86,7 +143,8 @@ export async function sendNotification(
   timeout: number,
   iconPath?: string,
   notificationSystem: "osascript" | "node-notifier" | "ghostty" = "osascript",
-  linuxGrouping: boolean = true
+  linuxGrouping: boolean = true,
+  eventType?: NotificationEventType
 ): Promise<void> {
   const now = Date.now()
   if (lastNotificationTime[message] && now - lastNotificationTime[message] < DEBOUNCE_MS) {
@@ -141,8 +199,16 @@ export async function sendNotification(
         linuxNotifySendSupportsReplace = await detectNotifySendCapabilities()
       }
       if (linuxNotifySendSupportsReplace) {
-        return sendLinuxNotificationDirect(title, message, timeout, iconPath, true)
+        const sent = await sendLinuxNotificationDirect(title, message, timeout, iconPath, true, eventType)
+        if (sent) {
+          return
+        }
       }
+    }
+
+    const sent = await sendLinuxNotificationDirect(title, message, timeout, iconPath, false, eventType)
+    if (sent) {
+      return
     }
   }
 

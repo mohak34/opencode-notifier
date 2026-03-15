@@ -120,7 +120,7 @@ describe("Config", () => {
 
     expect(isEventSoundEnabled(config, "user_cancelled")).toBe(false)
     expect(isEventNotificationEnabled(config, "user_cancelled")).toBe(false)
-    expect(config.messages.user_cancelled).toBe("Session was cancelled by user: {sessionTitle}")
+    expect(config.messages.user_cancelled).toBe("Cancelled: {sessionTitle}")
   })
 
   test("loadConfig parses user_cancelled event config from file", async () => {

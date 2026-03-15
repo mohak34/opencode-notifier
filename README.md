@@ -38,6 +38,12 @@ sudo pacman -S libnotify         # Arch
 
 For sounds, you need one of: `paplay`, `aplay`, `mpv`, or `ffplay`
 
+Linux notifications also include default urgency levels for better priority handling:
+- `error` -> critical
+- `permission` / `question` / `interrupted` -> normal
+- `complete` / `subagent_complete` -> normal
+- `user_cancelled` -> low
+
 **Windows**: Works out of the box. But heads up:
 - Only `.wav` files work (not mp3)
 - Use full paths like `C:/Users/You/sounds/alert.wav` not `~/`
@@ -74,12 +80,12 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
     "user_cancelled": { "sound": false, "notification": false }
   },
   "messages": {
-    "permission": "Session needs permission: {sessionTitle}",
-    "complete": "Session has finished: {sessionTitle}",
-    "subagent_complete": "Subagent task completed: {sessionTitle}",
-    "error": "Session encountered an error: {sessionTitle}",
-    "question": "Session has a question: {sessionTitle}",
-    "user_cancelled": "Session was cancelled by user: {sessionTitle}"
+    "permission": "Permission needed: {sessionTitle}",
+    "complete": "Task complete: {sessionTitle}",
+    "subagent_complete": "Subagent complete: {sessionTitle}",
+    "error": "Error: {sessionTitle}",
+    "question": "Question: {sessionTitle}",
+    "user_cancelled": "Cancelled: {sessionTitle}"
   },
   "sounds": {
     "permission": null,
@@ -162,12 +168,12 @@ Customize the notification text:
 ```json
 {
   "messages": {
-    "permission": "Session needs permission: {sessionTitle}",
-    "complete": "Session has finished: {sessionTitle}",
-    "subagent_complete": "Subagent task completed: {sessionTitle}",
-    "error": "Session encountered an error: {sessionTitle}",
-    "question": "Session has a question: {sessionTitle}",
-    "user_cancelled": "Session was cancelled by user: {sessionTitle}"
+    "permission": "Permission needed: {sessionTitle}",
+    "complete": "Task complete: {sessionTitle}",
+    "subagent_complete": "Subagent complete: {sessionTitle}",
+    "error": "Error: {sessionTitle}",
+    "question": "Question: {sessionTitle}",
+    "user_cancelled": "Cancelled: {sessionTitle}"
   }
 }
 ```

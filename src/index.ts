@@ -124,7 +124,7 @@ async function handleEvent(
   if (isEventNotificationEnabled(config, eventType)) {
     const title = getNotificationTitle(config, projectName)
     const iconPath = getIconPath(config)
-    promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping))
+    promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping, eventType))
   }
 
   if (isEventSoundEnabled(config, eventType)) {
