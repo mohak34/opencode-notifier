@@ -81,11 +81,30 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000)
 
-function getNotificationTitle(config: NotifierConfig, projectName: string | null): string {
-  if (config.showProjectName && projectName) {
-    return `OpenCode (${projectName})`
+function getEventTitle(eventType: EventType): string {
+  switch (eventType) {
+    case "permission":
+      return "Permission Needed"
+    case "complete":
+      return "Task Complete"
+    case "subagent_complete":
+      return "Subagent Complete"
+    case "error":
+      return "Error"
+    case "question":
+      return "Question"
+    case "interrupted":
+      return "Interrupted"
+    case "user_cancelled":
+      return "Cancelled"
+    default:
+      return "Update"
   }
-  return "OpenCode"
+}
+
+function getNotificationTitle(config: NotifierConfig, projectName: string | null, eventType: EventType): string {
+  const baseTitle = config.showProjectName && projectName ? `OpenCode (${projectName})` : "OpenCode"
+  return `${baseTitle} - ${getEventTitle(eventType)}`
 }
 
 function formatTimestamp(): string {
@@ -94,6 +113,16 @@ function formatTimestamp(): string {
   const m = String(now.getMinutes()).padStart(2, "0")
   const s = String(now.getSeconds()).padStart(2, "0")
   return `${h}:${m}:${s}`
+}
+
+function formatNotificationMessage(message: string, timestamp: string, turn: number): string {
+  const parts: string[] = []
+  if (message.trim().length > 0) {
+    parts.push(message.trim())
+  }
+  parts.push(`at ${timestamp}`)
+  parts.push(`#${turn}`)
+  return parts.join(" • ")
 }
 
 async function handleEvent(
@@ -114,17 +143,18 @@ async function handleEvent(
   const turn = incrementTurnCount()
 
   const rawMessage = getMessage(config, eventType)
-  const message = interpolateMessage(rawMessage, {
+  const interpolatedMessage = interpolateMessage(rawMessage, {
     sessionTitle: config.showSessionTitle ? sessionTitle : null,
     projectName,
     timestamp,
     turn,
   })
+  const message = formatNotificationMessage(interpolatedMessage, timestamp, turn)
 
   if (isEventNotificationEnabled(config, eventType)) {
-    const title = getNotificationTitle(config, projectName)
+    const title = getNotificationTitle(config, projectName, eventType)
     const iconPath = getIconPath(config)
-    promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping))
+    promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping, eventType, sessionID))
   }
 
   if (isEventSoundEnabled(config, eventType)) {
