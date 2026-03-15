@@ -18,7 +18,7 @@ if (platform === "Linux" || platform.match(/BSD$/)) {
   platformNotifier = notifier
 }
 
-const lastNotificationTime: Record<string, number> = {}
+const lastNotificationTime = new Map<string, number>()
 
 const lastLinuxNotificationIds = new Map<string, number>()
 let linuxNotifySendSupportsReplace: boolean | null = null
@@ -69,7 +69,8 @@ function getLinuxStackTag(eventType?: NotificationEventType): string {
 
 function getLinuxThreadKey(sessionID?: string | null, eventType?: NotificationEventType): string {
   if (sessionID && sessionID.length > 0) {
-    return `opencode-session-${sessionID}`
+    const safeSessionID = sessionID.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 64)
+    return `opencode-session-${safeSessionID}`
   }
   return getLinuxStackTag(eventType)
 }
@@ -95,6 +96,41 @@ function getLinuxIcon(eventType?: NotificationEventType): string {
 
 function shouldEnableLinuxActions(eventType?: NotificationEventType): boolean {
   return eventType === "permission" || eventType === "question" || eventType === "error"
+}
+
+function getNotificationDebounceKey(message: string, eventType?: NotificationEventType, sessionID?: string | null): string {
+  if (sessionID && eventType) {
+    return `${sessionID}:${eventType}`
+  }
+
+  if (eventType) {
+    return `${eventType}:${message}`
+  }
+
+  return message
+}
+
+function parseNotifySendOutput(stdout: string): { notificationId?: number; action?: "open" | "copy" } {
+  const lines = stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+
+  let notificationId: number | undefined
+  let action: "open" | "copy" | undefined
+
+  for (const line of lines) {
+    if (notificationId === undefined && /^\d+$/.test(line)) {
+      notificationId = parseInt(line, 10)
+      continue
+    }
+
+    if (line === "open" || line === "copy") {
+      action = line
+    }
+  }
+
+  return { notificationId, action }
 }
 
 function detectNotifySendCapabilities(): Promise<boolean> {
@@ -189,9 +225,13 @@ async function copyToLinuxClipboard(value: string): Promise<void> {
   child.stdin.end()
 }
 
-async function handleLinuxAction(action: string, message: string): Promise<void> {
+async function handleLinuxAction(action: "open" | "copy", message: string, sessionID?: string | null): Promise<void> {
   if (action === "open") {
-    runDetached("opencode")
+    if (sessionID && sessionID.length > 0) {
+      runDetached("opencode", ["--session", sessionID])
+      return
+    }
+    runDetached("opencode", [])
     return
   }
 
@@ -214,7 +254,7 @@ function sendLinuxNotificationDirect(
     const urgency = getLinuxUrgency(eventType)
     const threadKey = getLinuxThreadKey(sessionID, eventType)
 
-    args.push("--icon", getLinuxIcon(eventType))
+    args.push("--icon", iconPath || getLinuxIcon(eventType))
 
     args.push("--expire-time", String(timeout * 1000))
     args.push("--urgency", urgency)
@@ -224,14 +264,6 @@ function sendLinuxNotificationDirect(
     args.push("--hint", "string:desktop-entry:opencode")
     args.push("--hint", `string:x-canonical-private-synchronous:${threadKey}`)
     args.push("--hint", `string:x-dunst-stack-tag:${threadKey}`)
-
-    const supportsActions = linuxActionSupport === true
-    const useActions = supportsActions && shouldEnableLinuxActions(eventType)
-    if (useActions) {
-      args.push("--action", "open=Open OpenCode")
-      args.push("--action", "copy=Copy message")
-      args.push("--wait")
-    }
 
     const lastNotificationId = lastLinuxNotificationIds.get(threadKey)
     if (grouping && typeof lastNotificationId === "number") {
@@ -251,23 +283,74 @@ function sendLinuxNotificationDirect(
       }
 
       if (grouping && stdout) {
-        const firstLine = stdout.trim().split("\n")[0]
-        const id = parseInt(firstLine, 10)
-        if (!isNaN(id)) {
-          lastLinuxNotificationIds.set(threadKey, id)
-        }
-      }
-
-      if (useActions && stdout) {
-        const lines = stdout.trim().split("\n").map((line) => line.trim()).filter((line) => line.length > 0)
-        const actionLine = lines[lines.length - 1]
-        if (actionLine) {
-          void handleLinuxAction(actionLine, message)
+        const parsed = parseNotifySendOutput(stdout)
+        if (typeof parsed.notificationId === "number") {
+          lastLinuxNotificationIds.set(threadKey, parsed.notificationId)
         }
       }
       resolve(true)
     })
   })
+}
+
+function sendLinuxNotificationWithActions(
+  title: string,
+  message: string,
+  timeout: number,
+  iconPath?: string,
+  grouping: boolean = true,
+  eventType?: NotificationEventType,
+  sessionID?: string | null
+): void {
+  const args: string[] = []
+  const urgency = getLinuxUrgency(eventType)
+  const threadKey = getLinuxThreadKey(sessionID, eventType)
+
+  args.push("--icon", iconPath || getLinuxIcon(eventType))
+  args.push("--expire-time", String(timeout * 1000))
+  args.push("--urgency", urgency)
+  args.push("--app-name", "OpenCode")
+  args.push("--category", getLinuxCategory(eventType))
+  args.push("--hint", "string:desktop-entry:opencode")
+  args.push("--hint", `string:x-canonical-private-synchronous:${threadKey}`)
+  args.push("--hint", `string:x-dunst-stack-tag:${threadKey}`)
+  args.push("--action", "open=Open OpenCode")
+  args.push("--action", "copy=Copy message")
+  args.push("--wait")
+
+  const lastNotificationId = lastLinuxNotificationIds.get(threadKey)
+  if (grouping && typeof lastNotificationId === "number") {
+    args.push("--replace-id", String(lastNotificationId))
+  }
+
+  if (grouping) {
+    args.push("--print-id")
+  }
+
+  args.push("--", title, message)
+
+  const child = spawn("notify-send", args, {
+    detached: true,
+    stdio: ["ignore", "pipe", "ignore"],
+  })
+
+  let stdout = ""
+  child.stdout.on("data", (chunk: Buffer | string) => {
+    stdout += String(chunk)
+  })
+
+  child.on("close", () => {
+    const parsed = parseNotifySendOutput(stdout)
+    if (typeof parsed.notificationId === "number") {
+      lastLinuxNotificationIds.set(threadKey, parsed.notificationId)
+    }
+
+    if (parsed.action) {
+      void handleLinuxAction(parsed.action, message, sessionID)
+    }
+  })
+
+  child.unref()
 }
 
 export async function sendNotification(
@@ -281,10 +364,12 @@ export async function sendNotification(
   sessionID?: string | null
 ): Promise<void> {
   const now = Date.now()
-  if (lastNotificationTime[message] && now - lastNotificationTime[message] < DEBOUNCE_MS) {
+  const debounceKey = getNotificationDebounceKey(message, eventType, sessionID)
+  const last = lastNotificationTime.get(debounceKey)
+  if (last && now - last < DEBOUNCE_MS) {
     return
   }
-  lastNotificationTime[message] = now
+  lastNotificationTime.set(debounceKey, now)
 
   if (notificationSystem === "ghostty") {
     return new Promise((resolve) => {
@@ -330,6 +415,11 @@ export async function sendNotification(
   if (platform === "Linux" || platform.match(/BSD$/)) {
     if (linuxActionSupport === null) {
       linuxActionSupport = await detectNotifySendActionSupport()
+    }
+
+    if (linuxActionSupport && shouldEnableLinuxActions(eventType)) {
+      sendLinuxNotificationWithActions(title, message, timeout, iconPath, linuxGrouping, eventType, sessionID)
+      return
     }
 
     if (linuxGrouping) {
