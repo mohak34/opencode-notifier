@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, writeFileSync } from "fs"
+import { readFileSync, existsSync } from "fs"
 import { join, dirname } from "path"
 import { homedir } from "os"
 import { fileURLToPath } from "url"
@@ -8,6 +8,7 @@ export type EventType = "permission" | "complete" | "subagent_complete" | "error
 export interface EventConfig {
   sound: boolean
   notification: boolean
+  command: boolean
 }
 
 export interface CommandConfig {
@@ -80,6 +81,7 @@ export interface NotifierConfig {
 const DEFAULT_EVENT_CONFIG: EventConfig = {
   sound: true,
   notification: true,
+  command: true,
 }
 
 const DEFAULT_CONFIG: NotifierConfig = {
@@ -102,11 +104,11 @@ const DEFAULT_CONFIG: NotifierConfig = {
   events: {
     permission: { ...DEFAULT_EVENT_CONFIG },
     complete: { ...DEFAULT_EVENT_CONFIG },
-    subagent_complete: { sound: false, notification: false },
+    subagent_complete: { ...DEFAULT_EVENT_CONFIG, sound: false, notification: false },
     error: { ...DEFAULT_EVENT_CONFIG },
     question: { ...DEFAULT_EVENT_CONFIG },
     interrupted: { ...DEFAULT_EVENT_CONFIG },
-    user_cancelled: { sound: false, notification: false },
+    user_cancelled: { ...DEFAULT_EVENT_CONFIG, sound: false, notification: false },
   },
   messages: {
     permission: "Session needs permission: {sessionTitle}",
@@ -150,7 +152,7 @@ export function getStatePath(): string {
 }
 
 function parseEventConfig(
-  userEvent: boolean | { sound?: boolean; notification?: boolean } | undefined,
+  userEvent: boolean | { sound?: boolean; notification?: boolean; command?: boolean } | undefined,
   defaultConfig: EventConfig
 ): EventConfig {
   if (userEvent === undefined) {
@@ -161,12 +163,14 @@ function parseEventConfig(
     return {
       sound: userEvent,
       notification: userEvent,
+      command: userEvent,
     }
   }
 
   return {
     sound: userEvent.sound ?? defaultConfig.sound,
     notification: userEvent.notification ?? defaultConfig.notification,
+    command: userEvent.command ?? defaultConfig.command,
   }
 }
 
@@ -203,6 +207,7 @@ export function loadConfig(): NotifierConfig {
     const defaultWithGlobal: EventConfig = {
       sound: globalSound,
       notification: globalNotification,
+      command: true,
     }
 
     const userCommand = userConfig.command ?? {}
@@ -246,11 +251,11 @@ export function loadConfig(): NotifierConfig {
       events: {
         permission: parseEventConfig(userConfig.events?.permission ?? userConfig.permission, defaultWithGlobal),
         complete: parseEventConfig(userConfig.events?.complete ?? userConfig.complete, defaultWithGlobal),
-        subagent_complete: parseEventConfig(userConfig.events?.subagent_complete ?? userConfig.subagent_complete, { sound: false, notification: false }),
+        subagent_complete: parseEventConfig(userConfig.events?.subagent_complete ?? userConfig.subagent_complete, { sound: false, notification: false, command: true }),
         error: parseEventConfig(userConfig.events?.error ?? userConfig.error, defaultWithGlobal),
         question: parseEventConfig(userConfig.events?.question ?? userConfig.question, defaultWithGlobal),
         interrupted: parseEventConfig(userConfig.events?.interrupted ?? userConfig.interrupted, defaultWithGlobal),
-        user_cancelled: parseEventConfig(userConfig.events?.user_cancelled ?? userConfig.user_cancelled, { sound: false, notification: false }),
+        user_cancelled: parseEventConfig(userConfig.events?.user_cancelled ?? userConfig.user_cancelled, { sound: false, notification: false, command: true }),
       },
       messages: {
         permission: userConfig.messages?.permission ?? DEFAULT_CONFIG.messages.permission,
@@ -296,6 +301,10 @@ export function isEventNotificationEnabled(config: NotifierConfig, event: EventT
   return config.events[event].notification
 }
 
+export function isEventCommandEnabled(config: NotifierConfig, event: EventType): boolean {
+  return config.events[event].command
+}
+
 export function getMessage(config: NotifierConfig, event: EventType): string {
   return config.messages[event]
 }
@@ -312,19 +321,19 @@ export function getIconPath(config: NotifierConfig): string | undefined {
   if (!config.showIcon) {
     return undefined
   }
-  
+
   try {
     const __filename = fileURLToPath(import.meta.url)
     const __dirname = dirname(__filename)
     const iconPath = join(__dirname, "..", "logos", "opencode-logo-dark.png")
-    
+
     if (existsSync(iconPath)) {
       return iconPath
     }
   } catch {
     // Ignore errors - notifications will work without icon
   }
-  
+
   return undefined
 }
 

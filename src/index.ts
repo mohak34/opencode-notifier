@@ -1,11 +1,11 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin"
-import { tool } from "@opencode-ai/plugin"
 import { basename } from "path"
 import { readFileSync, writeFileSync } from "fs"
 import {
   loadConfig,
   isEventSoundEnabled,
   isEventNotificationEnabled,
+  isEventCommandEnabled,
   getMessage,
   getSoundPath,
   getSoundVolume,
@@ -135,12 +135,13 @@ async function handleEvent(
 
   const minDuration = config.command?.minDuration
   const shouldSkipCommand =
-    typeof minDuration === "number" &&
-    Number.isFinite(minDuration) &&
-    minDuration > 0 &&
-    typeof elapsedSeconds === "number" &&
-    Number.isFinite(elapsedSeconds) &&
-    elapsedSeconds < minDuration
+    !isEventCommandEnabled(config, eventType) ||
+    (typeof minDuration === "number" &&
+      Number.isFinite(minDuration) &&
+      minDuration > 0 &&
+      typeof elapsedSeconds === "number" &&
+      Number.isFinite(elapsedSeconds) &&
+      elapsedSeconds < minDuration)
 
   if (!shouldSkipCommand) {
     runCommand(config, eventType, message, sessionTitle, projectName, timestamp, turn)

@@ -66,12 +66,12 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
     "minDuration": 0
   },
   "events": {
-    "permission": { "sound": true, "notification": true },
-    "complete": { "sound": true, "notification": true },
-    "subagent_complete": { "sound": false, "notification": false },
-    "error": { "sound": true, "notification": true },
-    "question": { "sound": true, "notification": true },
-    "user_cancelled": { "sound": false, "notification": false }
+    "permission": { "sound": true, "notification": true, "command": true },
+    "complete": { "sound": true, "notification": true, "command": true },
+    "subagent_complete": { "sound": false, "notification": false, "command": true },
+    "error": { "sound": true, "notification": true, "command": true },
+    "question": { "sound": true, "notification": true, "command": true },
+    "user_cancelled": { "sound": false, "notification": false, "command": true }
   },
   "messages": {
     "permission": "Session needs permission: {sessionTitle}",
@@ -133,17 +133,19 @@ Control each event separately:
 ```json
 {
   "events": {
-    "permission": { "sound": true, "notification": true },
-    "complete": { "sound": true, "notification": true },
-    "subagent_complete": { "sound": false, "notification": false },
-    "error": { "sound": true, "notification": true },
-    "question": { "sound": true, "notification": true },
-    "user_cancelled": { "sound": false, "notification": false }
+    "permission": { "sound": true, "notification": true, "command": true },
+    "complete": { "sound": true, "notification": true, "command": true },
+    "subagent_complete": { "sound": false, "notification": false, "command": true },
+    "error": { "sound": true, "notification": true, "command": true },
+    "question": { "sound": true, "notification": true, "command": true },
+    "user_cancelled": { "sound": false, "notification": false, "command": true }
   }
 }
 ```
 
 `user_cancelled` fires when you press ESC to abort a session. It's silent by default so intentional cancellations don't trigger error alerts. Set `sound` or `notification` to `true` if you want confirmation when cancelling.
+
+The `command` property controls whether the custom command (see [Custom commands](#custom-commands)) runs for that event. Defaults to `true` for all events. Set it to `false` to suppress the command for specific events without disabling it globally.
 
 Or use true/false for both:
 
