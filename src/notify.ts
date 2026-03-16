@@ -52,7 +52,7 @@ function sendLinuxNotificationDirect(
   return new Promise((resolve) => {
     const args: string[] = []
 
-    args.push("-a", "opencode")
+    args.push("--app-name", "opencode")
 
     if (iconPath) {
       args.push("--icon", iconPath)
