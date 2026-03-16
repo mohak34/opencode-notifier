@@ -52,6 +52,8 @@ function sendLinuxNotificationDirect(
   return new Promise((resolve) => {
     const args: string[] = []
 
+    args.push("-a", "opencode")
+
     if (iconPath) {
       args.push("--icon", iconPath)
     }
@@ -152,6 +154,7 @@ export async function sendNotification(
       message: message,
       timeout: timeout,
       icon: iconPath,
+      "app-name": "opencode",
     }
 
     platformNotifier.notify(
