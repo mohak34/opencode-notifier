@@ -1,10 +1,18 @@
-import { execSync } from "child_process"
+import { execFileSync, execSync } from "child_process";
 
 function execWithTimeout(command: string, timeoutMs: number = 500): string | null {
   try {
     return execSync(command, { timeout: timeoutMs, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim()
   } catch {
     return null
+  }
+}
+
+function execFileWithTimeout(command: string, args: readonly string[], timeoutMs: number = 500): string | null {
+  try {
+    return execFileSync(command, args,{ timeout: timeoutMs, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return null;
   }
 }
 
@@ -60,19 +68,12 @@ function getLinuxWaylandActiveWindowId(): string | null {
   return null
 }
 
-function getWindowsActiveWindowId(): string | null {
-  const script = `
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-public class FocusHelper {
-  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
-}
-"@
-$hwnd = [FocusHelper]::GetForegroundWindow()
-Write-Output $hwnd
-`.trim().replace(/\n/g, "; ")
-  return execWithTimeout(`powershell -NoProfile -Command "${script}"`, 1000)
+function getWindowsActiveWindowId() {
+  const script = `$type=Add-Type -Name FocusHelper -Namespace OpenCodeNotifier -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();' -PassThru; $type::GetForegroundWindow()`;
+  let windowId = execFileWithTimeout("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], 1e3);
+  if (!windowId)
+    windowId = execFileWithTimeout("pwsh", ["-NoProfile", "-NonInteractive", "-Command", script], 1e3);
+  return windowId;
 }
 
 function getMacOSActiveWindowId(): string | null {
