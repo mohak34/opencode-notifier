@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.36] - 2026-03-24
+
+### Fixed
+- Remove legacy `permission.updated` handler to prevent duplicate sounds on Windows (#52)
+  - The handler fired on every permission state change (asked + resolved), causing double sounds when the user took >1s to respond
+  - `permission.asked` event and `permission.ask` hook already cover all modern OpenCode versions
+
+## [0.1.35] - 2026-03-17
+
+### Fixed
+- macOS terminal focus detection now correctly identifies the frontmost app (#49)
+  - Previously used window ID matching which failed when the terminal wasn't the active window
+  - Now uses `osascript` to get the frontmost app name and checks against known terminal emulators
+  - Supports Terminal, iTerm2, Ghostty, WezTerm, Alacritty, Kitty, Hyper, Warp, Tabby, Cursor, VS Code, Zed, Rio
+  - Falls back to checking all known terminal names if `TERM_PROGRAM` is unset
+
 ## [0.1.34] - 2026-03-17
 
 ### Added
