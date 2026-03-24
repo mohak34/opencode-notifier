@@ -364,10 +364,6 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
   return {
     event: async ({ event }) => {
       const config = getConfig()
-      if (event.type === "permission.updated") {
-        await handleEventWithElapsedTime(client, config, "permission", projectName, event)
-      }
-
       if ((event as any).type === "permission.asked") {
         await handleEventWithElapsedTime(client, config, "permission", projectName, event)
       }
