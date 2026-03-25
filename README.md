@@ -320,10 +320,11 @@ To disable this and always get notified:
 | macOS | AppleScript (`System Events`) | None | Untested |
 | Linux X11 | `xdotool` | `xdotool` installed | Untested |
 | Linux Wayland (Hyprland) | `hyprctl activewindow` | None | Tested |
+| Linux Wayland (Niri) | `niri msg --json focused-window` | None | Tested |
 | Linux Wayland (Sway) | `swaymsg -t get_tree` | None | Untested |
 | Linux Wayland (KDE) | `kdotool` | `kdotool` installed | Untested |
 | Linux Wayland (GNOME) | Not supported | - | Falls back to always notifying |
-| Linux Wayland (Niri, river, dwl, Cosmic, etc.) | Not supported | - | Falls back to always notifying |
+| Linux Wayland (river, dwl, Cosmic, etc.) | Not supported | - | Falls back to always notifying |
 | Windows | `GetForegroundWindow()` via PowerShell | None | Untested |
 
 **Unsupported compositors**: Wayland has no standard protocol for querying the focused window. Each compositor has its own IPC, and GNOME intentionally doesn't expose focus information. Unsupported compositors fall back to always notifying.

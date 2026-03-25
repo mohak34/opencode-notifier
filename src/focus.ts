@@ -78,9 +78,21 @@ function getSwayActiveWindowId(): string | null {
   }
 }
 
+function getNiriActiveWindowId(): string | null {
+  const output = execWithTimeout("niri msg --json focused-window", 1000)
+  if (!output) return null
+  try {
+    const data = JSON.parse(output)
+    return typeof data?.id === "number" ? String(data.id) : null
+  } catch {
+    return null
+  }
+}
+
 function getLinuxWaylandActiveWindowId(): string | null {
   const env = process.env
   if (env.HYPRLAND_INSTANCE_SIGNATURE) return getHyprlandActiveWindowId()
+  if (env.NIRI_SOCKET) return getNiriActiveWindowId()
   if (env.SWAYSOCK) return getSwayActiveWindowId()
   if (env.KDE_SESSION_VERSION) return execWithTimeout("kdotool getactivewindow")
   return null
