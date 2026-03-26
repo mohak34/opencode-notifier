@@ -23,6 +23,26 @@ const lastNotificationTime: Record<string, number> = {}
 let lastLinuxNotificationId: number | null = null
 let linuxNotifySendSupportsReplace: boolean | null = null
 
+function sanitizeGhosttyField(value: string): string {
+  return value.replace(/[;\x07\x1b\n\r]/g, "")
+}
+
+export function formatGhosttyNotificationSequence(
+  title: string,
+  message: string,
+  env: NodeJS.ProcessEnv = process.env
+): string {
+  const escapedTitle = sanitizeGhosttyField(title)
+  const escapedMessage = sanitizeGhosttyField(message)
+  const payload = `\x1b]9;${escapedTitle}: ${escapedMessage}\x07`
+
+  if (env.TMUX) {
+    return `\x1bPtmux;\x1b${payload}\x1b\\`
+  }
+
+  return payload
+}
+
 function detectNotifySendCapabilities(): Promise<boolean> {
   return new Promise((resolve) => {
     execFile("notify-send", ["--version"], (error, stdout) => {
@@ -98,9 +118,8 @@ export async function sendNotification(
 
   if (notificationSystem === "ghostty") {
     return new Promise((resolve) => {
-      const escapedTitle = title.replace(/[;\x07\x1b\n\r]/g, "")
-      const escapedMessage = message.replace(/[;\x07\x1b\n\r]/g, "")
-      process.stdout.write(`\x1b]9;${escapedTitle}: ${escapedMessage}\x07`, () => {
+      const sequence = formatGhosttyNotificationSequence(title, message)
+      process.stdout.write(sequence, () => {
         resolve()
       })
     })

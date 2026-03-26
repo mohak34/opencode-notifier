@@ -329,7 +329,7 @@ To disable this and always get notified:
 
 **Unsupported compositors**: Wayland has no standard protocol for querying the focused window. Each compositor has its own IPC, and GNOME intentionally doesn't expose focus information. Unsupported compositors fall back to always notifying.
 
-**tmux/screen**: When running inside tmux, the tmux server daemonizes and detaches from the terminal's process tree. The plugin handles this by querying the tmux client PID and walking from there. GNU Screen has the same issue but is not currently handled (falls back to always notifying).
+**tmux/screen**: When running inside tmux, focus detection uses tmux pane state (`session_attached`, `window_active`, `pane_active`) via `tmux display-message`. This keeps suppression accurate when switching panes/windows/sessions. GNU Screen is not currently handled (falls back to always notifying).
 
 **Fail-open design**: If detection fails for any reason (missing tools, unknown compositor, permissions), it falls back to always notifying. It never silently eats your notifications.
 

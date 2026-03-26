@@ -18,6 +18,7 @@ import { sendNotification } from "./notify"
 import { playSound } from "./sound"
 import { runCommand } from "./command"
 import { isTerminalFocused } from "./focus"
+import { shouldSuppressPermissionAlert, prunePermissionAlertState } from "./permission-dedupe"
 
 const IDLE_COMPLETE_DELAY_MS = 350
 
@@ -79,6 +80,8 @@ setInterval(() => {
       sessionLastBusyAt.delete(sessionID)
     }
   }
+
+  prunePermissionAlertState(cutoff)
 }, 5 * 60 * 1000)
 
 function getNotificationTitle(config: NotifierConfig, projectName: string | null): string {
@@ -365,7 +368,10 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
     event: async ({ event }) => {
       const config = getConfig()
       if ((event as any).type === "permission.asked") {
-        await handleEventWithElapsedTime(client, config, "permission", projectName, event)
+        const sessionID = getSessionIDFromEvent(event)
+        if (!shouldSuppressPermissionAlert(sessionID)) {
+          await handleEventWithElapsedTime(client, config, "permission", projectName, event)
+        }
       }
 
       if (event.type === "session.idle") {
@@ -395,7 +401,9 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
     },
     "permission.ask": async () => {
       const config = getConfig()
-      await handleEvent(config, "permission", projectName, null)
+      if (!shouldSuppressPermissionAlert(null)) {
+        await handleEvent(config, "permission", projectName, null)
+      }
     },
     "tool.execute.before": async (input) => {
       const config = getConfig()
