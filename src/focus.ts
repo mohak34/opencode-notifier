@@ -130,6 +130,10 @@ function getExpectedMacTerminalAppNames(env: NodeJS.ProcessEnv): Set<string> {
   const expected = new Set<string>()
   const termProgram = typeof env.TERM_PROGRAM === "string" ? normalizeMacAppName(env.TERM_PROGRAM) : ""
 
+  if (env.TMUX && (termProgram === "tmux" || termProgram === "screen" || termProgram.length === 0)) {
+    return new Set(MAC_TERMINAL_APP_NAMES)
+  }
+
   if (termProgram === "apple_terminal") {
     expected.add("terminal")
   } else if (termProgram === "iterm" || termProgram === "iterm2") {

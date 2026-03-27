@@ -32,6 +32,17 @@ describe("isMacTerminalAppFocused", () => {
     expect(isMacTerminalAppFocused("Safari", env)).toBe(false)
     expect(isMacTerminalAppFocused("Terminal", env)).toBe(true)
   })
+
+  test("tmux on macOS falls back to terminal allowlist", () => {
+    const env = { TERM_PROGRAM: "tmux", TMUX: "/tmp/tmux-1000/default,1234,0" }
+    expect(isMacTerminalAppFocused("Ghostty", env)).toBe(true)
+    expect(isMacTerminalAppFocused("Terminal", env)).toBe(true)
+  })
+
+  test("tmux fallback still rejects non-terminal frontmost app", () => {
+    const env = { TERM_PROGRAM: "tmux", TMUX: "/tmp/tmux-1000/default,1234,0" }
+    expect(isMacTerminalAppFocused("Safari", env)).toBe(false)
+  })
 })
 
 describe("isTmuxPaneFocused", () => {
