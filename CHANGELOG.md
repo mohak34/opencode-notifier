@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-03-30
+
+### Added
+- WezTerm pane-aware focus suppression (#54)
+  - Uses `WEZTERM_PANE` with `wezterm cli list-clients --format json`
+  - Suppresses alerts only when your current WezTerm pane is focused
+- New `{agentName}` placeholder for notifications and command args (#51)
+  - Extracted from subagent session title suffix `(@name subagent)`
+  - Resolves to empty string for non-subagent sessions
+- Linux Niri focus detection support (#53)
+  - Uses `niri msg --json focused-window` when `NIRI_SOCKET` is present
+
+### Fixed
+- tmux focus suppression hardening
+  - Pane focus check now uses safer `tmux display-message` argument execution
+  - Missing or failed tmux pane probe now fails open (notify instead of silent suppression)
+- macOS focus suppression when running inside tmux (#50)
+  - Handles `TERM_PROGRAM=tmux`/`screen` fallback correctly for terminal app matching
+- Ghostty notifications inside tmux
+  - Uses tmux passthrough wrapping for OSC 9 payloads so visual notifications render inside tmux
+- Permission notification routing dedupe
+  - Prevents duplicate permission alerts when both `permission.asked` event and `permission.ask` hook fire close together
+
+### Changed
+- Focus detection docs now match implementation details for tmux and WezTerm
+- Added test coverage for WezTerm pane parsing and recently hardened focus paths
+
 ## [0.1.36] - 2026-03-24
 
 ### Fixed
