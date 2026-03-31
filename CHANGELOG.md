@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-04-01
+
+### Fixed
+- Guard `{agentName}` extraction against non-string session titles (#57)
+  - Prevents runtime `TypeError` when upstream session title data is not a string
+  - Safely normalizes session title to `string | null` before placeholder extraction
+  - Adds regression tests for non-string title inputs
+
 ## [0.2.0] - 2026-03-30
 
 ### Added
