@@ -121,6 +121,36 @@ describe("Config", () => {
     expect(isEventSoundEnabled(config, "user_cancelled")).toBe(false)
     expect(isEventNotificationEnabled(config, "user_cancelled")).toBe(false)
     expect(config.messages.user_cancelled).toBe("Session was cancelled by user: {sessionTitle}")
+    expect(isEventSoundEnabled(config, "plan_exit")).toBe(true)
+    expect(isEventNotificationEnabled(config, "plan_exit")).toBe(true)
+    expect(config.messages.plan_exit).toBe("Plan ready for review: {sessionTitle}")
+  })
+
+  test("loadConfig parses plan_exit event config from file", async () => {
+    const testConfig = {
+      events: {
+        plan_exit: { sound: false, notification: true, command: false },
+      },
+      messages: {
+        plan_exit: "Plan is ready",
+      },
+      sounds: {
+        plan_exit: "/tmp/plan.wav",
+      },
+      volumes: {
+        plan_exit: 0.35,
+      },
+    }
+    writeFileSync(testConfigPath, JSON.stringify(testConfig))
+
+    const { loadConfig, isEventSoundEnabled, isEventNotificationEnabled, getMessage, getSoundPath, getSoundVolume } = await import("./config")
+    const config = loadConfig()
+
+    expect(isEventSoundEnabled(config, "plan_exit")).toBe(false)
+    expect(isEventNotificationEnabled(config, "plan_exit")).toBe(true)
+    expect(getMessage(config, "plan_exit")).toBe("Plan is ready")
+    expect(getSoundPath(config, "plan_exit")).toBe("/tmp/plan.wav")
+    expect(getSoundVolume(config, "plan_exit")).toBe(0.35)
   })
 
   test("loadConfig parses user_cancelled event config from file", async () => {

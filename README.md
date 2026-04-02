@@ -72,7 +72,8 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
     "subagent_complete": { "sound": false, "notification": false, "command": true },
     "error": { "sound": true, "notification": true, "command": true },
     "question": { "sound": true, "notification": true, "command": true },
-    "user_cancelled": { "sound": false, "notification": false, "command": true }
+    "user_cancelled": { "sound": false, "notification": false, "command": true },
+    "plan_exit": { "sound": true, "notification": true, "command": true }
   },
   "messages": {
     "permission": "Session needs permission: {sessionTitle}",
@@ -80,7 +81,8 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
     "subagent_complete": "Subagent task completed: {sessionTitle}",
     "error": "Session encountered an error: {sessionTitle}",
     "question": "Session has a question: {sessionTitle}",
-    "user_cancelled": "Session was cancelled by user: {sessionTitle}"
+    "user_cancelled": "Session was cancelled by user: {sessionTitle}",
+    "plan_exit": "Plan ready for review: {sessionTitle}"
   },
   "sounds": {
     "permission": null,
@@ -88,7 +90,8 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
     "subagent_complete": null,
     "error": null,
     "question": null,
-    "user_cancelled": null
+    "user_cancelled": null,
+    "plan_exit": null
   },
   "volumes": {
     "permission": 1,
@@ -96,7 +99,8 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
     "subagent_complete": 1,
     "error": 1,
     "question": 1,
-    "user_cancelled": 1
+    "user_cancelled": 1,
+    "plan_exit": 1
   }
 }
 ```
@@ -142,7 +146,8 @@ Control each event separately:
     "subagent_complete": { "sound": false, "notification": false, "command": true },
     "error": { "sound": true, "notification": true, "command": true },
     "question": { "sound": true, "notification": true, "command": true },
-    "user_cancelled": { "sound": false, "notification": false, "command": true }
+    "user_cancelled": { "sound": false, "notification": false, "command": true },
+    "plan_exit": { "sound": true, "notification": true, "command": true }
   }
 }
 ```
@@ -173,7 +178,8 @@ Customize the notification text:
     "subagent_complete": "Subagent task completed: {sessionTitle}",
     "error": "Session encountered an error: {sessionTitle}",
     "question": "Session has a question: {sessionTitle}",
-    "user_cancelled": "Session was cancelled by user: {sessionTitle}"
+    "user_cancelled": "Session was cancelled by user: {sessionTitle}",
+    "plan_exit": "Plan ready for review: {sessionTitle}"
   }
 }
 ```
@@ -204,7 +210,8 @@ Use your own sound files:
     "subagent_complete": "/path/to/subagent-done.wav",
     "error": "/path/to/error.wav",
     "question": "/path/to/question.wav",
-    "user_cancelled": "/path/to/cancelled.wav"
+    "user_cancelled": "/path/to/cancelled.wav",
+    "plan_exit": "/path/to/plan-ready.wav"
   }
 }
 ```
@@ -226,7 +233,8 @@ Set per-event volume from `0` to `1`:
     "subagent_complete": 0.15,
     "error": 1,
     "question": 0.7,
-    "user_cancelled": 0.5
+    "user_cancelled": 0.5,
+    "plan_exit": 0.6
   }
 }
 ```

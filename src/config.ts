@@ -3,7 +3,7 @@ import { join, dirname } from "path"
 import { homedir } from "os"
 import { fileURLToPath } from "url"
 
-export type EventType = "permission" | "complete" | "subagent_complete" | "error" | "question" | "interrupted" | "user_cancelled"
+export type EventType = "permission" | "complete" | "subagent_complete" | "error" | "question" | "interrupted" | "user_cancelled" | "plan_exit"
 
 export interface EventConfig {
   sound: boolean
@@ -50,6 +50,7 @@ export interface NotifierConfig {
     question: EventConfig
     interrupted: EventConfig
     user_cancelled: EventConfig
+    plan_exit: EventConfig
   }
   messages: {
     permission: string
@@ -59,6 +60,7 @@ export interface NotifierConfig {
     question: string
     interrupted: string
     user_cancelled: string
+    plan_exit: string
   }
   sounds: {
     permission: string | null
@@ -68,6 +70,7 @@ export interface NotifierConfig {
     question: string | null
     interrupted: string | null
     user_cancelled: string | null
+    plan_exit: string | null
   }
   volumes: {
     permission: number
@@ -77,6 +80,7 @@ export interface NotifierConfig {
     question: number
     interrupted: number
     user_cancelled: number
+    plan_exit: number
   }
 }
 
@@ -112,6 +116,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
     question: { ...DEFAULT_EVENT_CONFIG },
     interrupted: { ...DEFAULT_EVENT_CONFIG },
     user_cancelled: { ...DEFAULT_EVENT_CONFIG, sound: false, notification: false },
+    plan_exit: { ...DEFAULT_EVENT_CONFIG },
   },
   messages: {
     permission: "Session needs permission: {sessionTitle}",
@@ -121,6 +126,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
     question: "Session has a question: {sessionTitle}",
     interrupted: "Session was interrupted: {sessionTitle}",
     user_cancelled: "Session was cancelled by user: {sessionTitle}",
+    plan_exit: "Plan ready for review: {sessionTitle}",
   },
   sounds: {
     permission: null,
@@ -130,6 +136,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
     question: null,
     interrupted: null,
     user_cancelled: null,
+    plan_exit: null,
   },
   volumes: {
     permission: 1,
@@ -139,6 +146,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
     question: 1,
     interrupted: 1,
     user_cancelled: 1,
+    plan_exit: 1,
   },
 }
 
@@ -260,6 +268,7 @@ export function loadConfig(): NotifierConfig {
         question: parseEventConfig(userConfig.events?.question ?? userConfig.question, defaultWithGlobal),
         interrupted: parseEventConfig(userConfig.events?.interrupted ?? userConfig.interrupted, defaultWithGlobal),
         user_cancelled: parseEventConfig(userConfig.events?.user_cancelled ?? userConfig.user_cancelled, { sound: false, notification: false, command: true }),
+        plan_exit: parseEventConfig(userConfig.events?.plan_exit ?? userConfig.plan_exit, defaultWithGlobal),
       },
       messages: {
         permission: userConfig.messages?.permission ?? DEFAULT_CONFIG.messages.permission,
@@ -269,6 +278,7 @@ export function loadConfig(): NotifierConfig {
         question: userConfig.messages?.question ?? DEFAULT_CONFIG.messages.question,
         interrupted: userConfig.messages?.interrupted ?? DEFAULT_CONFIG.messages.interrupted,
         user_cancelled: userConfig.messages?.user_cancelled ?? DEFAULT_CONFIG.messages.user_cancelled,
+        plan_exit: userConfig.messages?.plan_exit ?? DEFAULT_CONFIG.messages.plan_exit,
       },
       sounds: {
         permission: userConfig.sounds?.permission ?? DEFAULT_CONFIG.sounds.permission,
@@ -278,6 +288,7 @@ export function loadConfig(): NotifierConfig {
         question: userConfig.sounds?.question ?? DEFAULT_CONFIG.sounds.question,
         interrupted: userConfig.sounds?.interrupted ?? DEFAULT_CONFIG.sounds.interrupted,
         user_cancelled: userConfig.sounds?.user_cancelled ?? DEFAULT_CONFIG.sounds.user_cancelled,
+        plan_exit: userConfig.sounds?.plan_exit ?? DEFAULT_CONFIG.sounds.plan_exit,
       },
       volumes: {
         permission: parseVolume(userConfig.volumes?.permission, DEFAULT_CONFIG.volumes.permission),
@@ -290,6 +301,7 @@ export function loadConfig(): NotifierConfig {
         question: parseVolume(userConfig.volumes?.question, DEFAULT_CONFIG.volumes.question),
         interrupted: parseVolume(userConfig.volumes?.interrupted, DEFAULT_CONFIG.volumes.interrupted),
         user_cancelled: parseVolume(userConfig.volumes?.user_cancelled, DEFAULT_CONFIG.volumes.user_cancelled),
+        plan_exit: parseVolume(userConfig.volumes?.plan_exit, DEFAULT_CONFIG.volumes.plan_exit),
       },
     }
   } catch {

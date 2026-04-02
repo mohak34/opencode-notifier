@@ -441,6 +441,9 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
       if (input.tool === "question") {
         await handleEvent(config, "question", projectName, null)
       }
+      if (input.tool === "plan_exit") {
+        await handleEvent(config, "plan_exit", projectName, null)
+      }
     },
   }
 }
