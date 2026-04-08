@@ -3,7 +3,18 @@ import { join, dirname } from "path"
 import { homedir } from "os"
 import { fileURLToPath } from "url"
 
-export type EventType = "permission" | "complete" | "subagent_complete" | "error" | "question" | "interrupted" | "user_cancelled" | "plan_exit"
+export type EventType = 
+  | "permission"
+  | "complete"
+  | "subagent_complete"
+  | "error"
+  | "question"
+  | "interrupted"
+  | "user_cancelled"
+  | "plan_exit"
+  | "session_started"
+  | "user_message"
+  | "client_connected"
 
 export interface EventConfig {
   sound: boolean
@@ -51,6 +62,9 @@ export interface NotifierConfig {
     interrupted: EventConfig
     user_cancelled: EventConfig
     plan_exit: EventConfig
+    session_started: EventConfig
+    user_message: EventConfig
+    client_connected: EventConfig
   }
   messages: {
     permission: string
@@ -61,6 +75,9 @@ export interface NotifierConfig {
     interrupted: string
     user_cancelled: string
     plan_exit: string
+    session_started: string
+    user_message: string
+    client_connected: string
   }
   sounds: {
     permission: string | null
@@ -71,6 +88,9 @@ export interface NotifierConfig {
     interrupted: string | null
     user_cancelled: string | null
     plan_exit: string | null
+    session_started: string | null
+    user_message: string | null
+    client_connected: string | null
   }
   volumes: {
     permission: number
@@ -81,6 +101,9 @@ export interface NotifierConfig {
     interrupted: number
     user_cancelled: number
     plan_exit: number
+    session_started: number
+    user_message: number
+    client_connected: number
   }
 }
 
@@ -117,6 +140,9 @@ const DEFAULT_CONFIG: NotifierConfig = {
     interrupted: { ...DEFAULT_EVENT_CONFIG },
     user_cancelled: { ...DEFAULT_EVENT_CONFIG, sound: false, notification: false },
     plan_exit: { ...DEFAULT_EVENT_CONFIG },
+    session_started: { ...DEFAULT_EVENT_CONFIG, notification: false },
+    user_message: { ...DEFAULT_EVENT_CONFIG, notification: false },
+    client_connected: { ...DEFAULT_EVENT_CONFIG, notification: false },
   },
   messages: {
     permission: "Session needs permission: {sessionTitle}",
@@ -127,6 +153,9 @@ const DEFAULT_CONFIG: NotifierConfig = {
     interrupted: "Session was interrupted: {sessionTitle}",
     user_cancelled: "Session was cancelled by user: {sessionTitle}",
     plan_exit: "Plan ready for review: {sessionTitle}",
+    session_started: "Session started: {sessionTitle}",
+    user_message: "User sent a message: {sessionTitle}",
+    client_connected: "OpenCode connected",
   },
   sounds: {
     permission: null,
@@ -137,6 +166,9 @@ const DEFAULT_CONFIG: NotifierConfig = {
     interrupted: null,
     user_cancelled: null,
     plan_exit: null,
+    session_started: null,
+    user_message: null,
+    client_connected: null,
   },
   volumes: {
     permission: 1,
@@ -147,6 +179,9 @@ const DEFAULT_CONFIG: NotifierConfig = {
     interrupted: 1,
     user_cancelled: 1,
     plan_exit: 1,
+    session_started: 1,
+    user_message: 1,
+    client_connected: 1,
   },
 }
 
@@ -269,6 +304,9 @@ export function loadConfig(): NotifierConfig {
         interrupted: parseEventConfig(userConfig.events?.interrupted ?? userConfig.interrupted, defaultWithGlobal),
         user_cancelled: parseEventConfig(userConfig.events?.user_cancelled ?? userConfig.user_cancelled, { sound: false, notification: false, command: true }),
         plan_exit: parseEventConfig(userConfig.events?.plan_exit ?? userConfig.plan_exit, defaultWithGlobal),
+        session_started: parseEventConfig(userConfig.events?.session_started ?? userConfig.session_started, { ...defaultWithGlobal, notification: false }),
+        user_message: parseEventConfig(userConfig.events?.user_message ?? userConfig.user_message, { ...defaultWithGlobal, notification: false }),
+        client_connected: parseEventConfig(userConfig.events?.client_connected ?? userConfig.client_connected, { ...defaultWithGlobal, notification: false }),
       },
       messages: {
         permission: userConfig.messages?.permission ?? DEFAULT_CONFIG.messages.permission,
@@ -279,6 +317,9 @@ export function loadConfig(): NotifierConfig {
         interrupted: userConfig.messages?.interrupted ?? DEFAULT_CONFIG.messages.interrupted,
         user_cancelled: userConfig.messages?.user_cancelled ?? DEFAULT_CONFIG.messages.user_cancelled,
         plan_exit: userConfig.messages?.plan_exit ?? DEFAULT_CONFIG.messages.plan_exit,
+        session_started: userConfig.messages?.session_started ?? DEFAULT_CONFIG.messages.session_started,
+        user_message: userConfig.messages?.user_message ?? DEFAULT_CONFIG.messages.user_message,
+        client_connected: userConfig.messages?.client_connected ?? DEFAULT_CONFIG.messages.client_connected,
       },
       sounds: {
         permission: userConfig.sounds?.permission ?? DEFAULT_CONFIG.sounds.permission,
@@ -289,6 +330,9 @@ export function loadConfig(): NotifierConfig {
         interrupted: userConfig.sounds?.interrupted ?? DEFAULT_CONFIG.sounds.interrupted,
         user_cancelled: userConfig.sounds?.user_cancelled ?? DEFAULT_CONFIG.sounds.user_cancelled,
         plan_exit: userConfig.sounds?.plan_exit ?? DEFAULT_CONFIG.sounds.plan_exit,
+        session_started: userConfig.sounds?.session_started ?? DEFAULT_CONFIG.sounds.session_started,
+        user_message: userConfig.sounds?.user_message ?? DEFAULT_CONFIG.sounds.user_message,
+        client_connected: userConfig.sounds?.client_connected ?? DEFAULT_CONFIG.sounds.client_connected,
       },
       volumes: {
         permission: parseVolume(userConfig.volumes?.permission, DEFAULT_CONFIG.volumes.permission),
@@ -302,6 +346,9 @@ export function loadConfig(): NotifierConfig {
         interrupted: parseVolume(userConfig.volumes?.interrupted, DEFAULT_CONFIG.volumes.interrupted),
         user_cancelled: parseVolume(userConfig.volumes?.user_cancelled, DEFAULT_CONFIG.volumes.user_cancelled),
         plan_exit: parseVolume(userConfig.volumes?.plan_exit, DEFAULT_CONFIG.volumes.plan_exit),
+        session_started: parseVolume(userConfig.volumes?.session_started, DEFAULT_CONFIG.volumes.session_started),
+        user_message: parseVolume(userConfig.volumes?.user_message, DEFAULT_CONFIG.volumes.user_message),
+        client_connected: parseVolume(userConfig.volumes?.client_connected, DEFAULT_CONFIG.volumes.client_connected),
       },
     }
   } catch {

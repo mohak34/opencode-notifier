@@ -24,6 +24,7 @@
     "build": "bun build src/index.ts --outdir dist --target node --external node-notifier",
     "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit",
+    "patch_live_plugin": "bun run build && cp dist/index.js /home/grota/.cache/opencode/node_modules/@mohak34/opencode-notifier/dist/",
     "test": "bun test"
   },
   "keywords": [

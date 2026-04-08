@@ -26,6 +26,7 @@ const pendingIdleTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const sessionIdleSequence = new Map<string, number>()
 const sessionErrorSuppressionAt = new Map<string, number>()
 const sessionLastBusyAt = new Map<string, number>()
+const subagentSessionIds = new Set<string>()
 
 let globalTurnCount: number | null = null
 
@@ -64,6 +65,8 @@ setInterval(() => {
     // If not in pendingIdleTimers, it's likely stale
     if (!pendingIdleTimers.has(sessionID)) {
       sessionIdleSequence.delete(sessionID)
+      // Also remove from subagent tracking if stale
+      subagentSessionIds.delete(sessionID)
     }
   }
 
@@ -310,6 +313,13 @@ async function processSessionIdle(
     return
   }
 
+  // Fast path: if we already know this is a subagent from in-memory tracking,
+  // skip the API call and go straight to subagent_complete
+  if (subagentSessionIds.has(sessionID)) {
+    await handleEventWithElapsedTime(client, config, "subagent_complete", projectName, event, idleReceivedAtMs, null)
+    return
+  }
+
   const sessionInfo = await getSessionInfo(client, sessionID)
 
   if (!hasCurrentSessionIdleSequence(sessionID, sequence)) {
@@ -325,6 +335,8 @@ async function processSessionIdle(
     return
   }
 
+  // Update in-memory set now that we confirmed it's a child via API
+  subagentSessionIds.add(sessionID)
   await handleEventWithElapsedTime(client, config, "subagent_complete", projectName, event, idleReceivedAtMs, sessionInfo.title)
 }
 
@@ -395,9 +407,43 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
   const getConfig = () => loadConfig()
   const projectName = directory ? basename(directory) : null
 
+  // Fire client_connected after the plugin is fully initialized.
+  // There is no SDK event that reliably signals client connection from a plugin's
+  // perspective, so we approximate it with a short delay after plugin startup.
+  // Config is read at fire-time so that any user overrides are respected.
+  setTimeout(() => {
+    void handleEvent(getConfig(), "client_connected", projectName, null)
+  }, 100)
+
   return {
     event: async ({ event }) => {
       const config = getConfig()
+
+      // Track subagent sessions from session lifecycle events
+      if (event.type === "session.created") {
+        const info = event.properties?.info
+        if (info?.parentID) {
+          subagentSessionIds.add(info.id)
+        } else {
+          // Non-subagent session started
+          await handleEvent(config, "session_started", projectName, null, info?.title ?? null, info?.id ?? null, null)
+        }
+      }
+
+      if (event.type === "session.updated") {
+        const info = event.properties?.info
+        if (info?.parentID && info?.id) {
+          subagentSessionIds.add(info.id)
+        }
+      }
+
+      if (event.type === "session.deleted") {
+        const info = event.properties?.info
+        if (info?.id) {
+          subagentSessionIds.delete(info.id)
+        }
+      }
+
       if ((event as any).type === "permission.asked") {
         const sessionID = getSessionIDFromEvent(event)
         if (!shouldSuppressPermissionAlert(sessionID)) {
@@ -428,6 +474,17 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
           sessionTitle = info.title
         }
         await handleEventWithElapsedTime(client, config, eventType, projectName, event, undefined, sessionTitle)
+      }
+
+      if (event.type === "message.updated") {
+        const role = (event as any).properties?.info?.role
+        if (role === "user") {
+          const sessionID = (event as any).properties?.info?.sessionID ?? null
+          // Only fire for non-subagent sessions
+          if (!sessionID || !subagentSessionIds.has(sessionID)) {
+            await handleEvent(config, "user_message", projectName, null, null, sessionID, null)
+          }
+        }
       }
     },
     "permission.ask": async () => {
