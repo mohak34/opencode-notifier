@@ -4,7 +4,7 @@ const MAC_TERMINAL_APP_NAMES = new Set<string>([
   "terminal",
   "iterm2",
   "ghostty",
-  "wezterm",
+  "wezterm-gui",
   "alacritty",
   "kitty",
   "hyper",
@@ -159,6 +159,8 @@ function getExpectedMacTerminalAppNames(env: NodeJS.ProcessEnv): Set<string> {
     expected.add("code insiders")
   } else if (termProgram === "warpterminal") {
     expected.add("warp")
+  } else if (termProgram === "wezterm") {
+    expected.add("wezterm-gui")
   } else if (termProgram.length > 0) {
     expected.add(termProgram)
   }
