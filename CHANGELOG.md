@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2] - 2026-04-12
+
+### Added
+- New terminal bell channel (`bell`) with global and per-event controls (#56)
+  - Global toggle: `bell`
+  - Per-event toggle: `events.<event>.bell`
+  - Emits terminal BEL (`\x07`) with TTY-safe behavior
+
+### Fixed
+- Added support for `plan_exit` notifications as a dedicated event (#59)
+- macOS WezTerm focus detection now matches `wezterm-gui` frontmost app name reliably (#64)
+
+### Changed
+- README now documents bell behavior and quick validation command (`printf '\\a'`)
+- Added regression tests for bell config/dispatch and WezTerm macOS focus mapping
+
 ## [0.2.1] - 2026-04-01
 
 ### Fixed
