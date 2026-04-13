@@ -42,6 +42,18 @@ For sounds, you need one of: `paplay`, `aplay`, `mpv`, or `ffplay`
 - Only `.wav` files work (not mp3)
 - Use full paths like `C:/Users/You/sounds/alert.wav` not `~/`
 
+**WSL**: It's recommeneded to set `customIconPath` pointing to a file on Windows filesystem
+due to issues with path translation (can be copied from `logos` folder from this repository).
+This path will be passed down to `snoretoast-*.exe`
+
+In `opencode-notifier.json` config:
+```json
+  "showIcon": true,
+  "customIconPath": "C:\\Users\\jhon\\Documents\\opencode-logo-dark.png",
+```
+
+- If notifications are not showing up, check out: (missing WSL notification)[https://github.com/mikaelbr/node-notifier?tab=readme-ov-file#windows-and-wsl2]
+
 ## Config file
 
 Create `~/.config/opencode/opencode-notifier.json` with the defaults:
@@ -55,6 +67,7 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
   "showProjectName": true,
   "showSessionTitle": false,
   "showIcon": true,
+  "customIconPath": null,
   "suppressWhenFocused": true,
   "enableOnDesktop": false,
   "notificationSystem": "osascript",

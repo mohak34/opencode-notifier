@@ -1,6 +1,7 @@
 import os from "os"
 import { exec, execFile } from "child_process"
 import notifier from "node-notifier"
+import isWsl from "is-wsl"
 
 const DEBOUNCE_MS = 1000
 
@@ -8,12 +9,12 @@ const platform = os.type()
 
 let platformNotifier: any
 
-if (platform === "Linux" || platform.match(/BSD$/)) {
-  const { NotifySend } = notifier
-  platformNotifier = new NotifySend({ withFallback: false })
-} else if (platform === "Windows_NT") {
+if (platform === "Windows_NT" || isWsl) {
   const { WindowsToaster } = notifier
   platformNotifier = new WindowsToaster({ withFallback: false })
+} else if (platform === "Linux" || platform.match(/BSD$/)) {
+  const { NotifySend } = notifier
+  platformNotifier = new NotifySend({ withFallback: false })
 } else if (platform !== "Darwin") {
   platformNotifier = notifier
 }
@@ -156,7 +157,7 @@ export async function sendNotification(
     })
   }
 
-  if (platform === "Linux" || platform.match(/BSD$/)) {
+  if ((platform === "Linux" || platform.match(/BSD$/)) && !isWsl) {
     if (linuxGrouping) {
       if (linuxNotifySendSupportsReplace === null) {
         linuxNotifySendSupportsReplace = await detectNotifySendCapabilities()

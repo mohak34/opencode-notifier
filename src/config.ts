@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from "fs"
 import { join, dirname } from "path"
 import { homedir } from "os"
 import { fileURLToPath } from "url"
+import isWsl from "is-wsl"
 
 export type EventType = 
   | "permission"
@@ -50,6 +51,7 @@ export interface NotifierConfig {
   showProjectName: boolean
   showSessionTitle: boolean
   showIcon: boolean
+  customIconPath: string | null
   suppressWhenFocused: boolean
   enableOnDesktop: boolean
   notificationSystem: "osascript" | "node-notifier" | "ghostty"
@@ -124,6 +126,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
   showProjectName: true,
   showSessionTitle: false,
   showIcon: true,
+  customIconPath: null,
   suppressWhenFocused: true,
   enableOnDesktop: false,
   notificationSystem: "osascript",
@@ -287,6 +290,7 @@ export function loadConfig(): NotifierConfig {
       showProjectName: userConfig.showProjectName ?? DEFAULT_CONFIG.showProjectName,
       showSessionTitle: userConfig.showSessionTitle ?? DEFAULT_CONFIG.showSessionTitle,
       showIcon: userConfig.showIcon ?? DEFAULT_CONFIG.showIcon,
+      customIconPath: userConfig.customIconPath ?? DEFAULT_CONFIG.customIconPath,
       suppressWhenFocused: userConfig.suppressWhenFocused ?? DEFAULT_CONFIG.suppressWhenFocused,
       enableOnDesktop: typeof userConfig.enableOnDesktop === "boolean" ? userConfig.enableOnDesktop : DEFAULT_CONFIG.enableOnDesktop,
       notificationSystem:
@@ -399,11 +403,20 @@ export function getIconPath(config: NotifierConfig): string | undefined {
   }
 
   try {
-    const __filename = fileURLToPath(import.meta.url)
-    const __dirname = dirname(__filename)
-    const iconPath = join(__dirname, "..", "logos", "opencode-logo-dark.png")
+    let iconPath: string
+    if (config.customIconPath) {
+      iconPath = config.customIconPath
+    } else {
+      const __filename = fileURLToPath(import.meta.url)
+      const __dirname = dirname(__filename)
+      iconPath = join(__dirname, "..", "logos", "opencode-logo-dark.png")
+    }
 
-    if (existsSync(iconPath)) {
+    // Don't check when invoked from WSL since it will
+    // fail to verify windows path anyway (currently
+    // path with backslackes needs to be specified)
+    // https://github.com/mikaelbr/node-notifier/issues/354
+    if (isWsl || existsSync(iconPath)) {
       return iconPath
     }
   } catch {
