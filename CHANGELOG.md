@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3] - 2026-04-21
+
+### Added
+- KDE Plasma notification jump-back action (#67)
+  - Click "Jump to terminal" button on KDE notifications to focus the terminal
+  - Uses kdotool or KWin scripts for focus routing
+  - Captures startup window ID for deterministic jump-back
+- WSL support (#65)
+  - Detects WSL and routes notifications through Windows SnoreToast
+  - Adds `customIconPath` config for Windows-native icon paths
+- Minimum duration threshold for DONE notifications (#68)
+  - New top-level `minDuration` config option (default: 0)
+  - Suppresses `complete` and `subagent_complete` events when session finishes faster than threshold
+  - Independent of `command.minDuration`
+
+### Fixed
+- tmux focus fallback when window detection fails (#69)
+  - Uses tmux pane state as best-effort fallback on Linux setups where window focus is unavailable
+  - Fixes `suppressWhenFocused` for GNOME Wayland + tmux users
+
 ## [0.2.2] - 2026-04-12
 
 ### Added
