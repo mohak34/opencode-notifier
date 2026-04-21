@@ -168,6 +168,15 @@ async function handleEvent(
     return
   }
 
+  if (
+    (eventType === "complete" || eventType === "subagent_complete") &&
+    typeof elapsedSeconds === "number" &&
+    Number.isFinite(elapsedSeconds) &&
+    elapsedSeconds < config.minDuration
+  ) {
+    return
+  }
+
   const promises: Promise<void>[] = []
 
   const timestamp = formatTimestamp()

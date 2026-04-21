@@ -76,6 +76,7 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
   "linux": {
     "grouping": false
   },
+  "minDuration": 0,
   "command": {
     "enabled": false,
     "path": "/path/to/command",
@@ -380,6 +381,20 @@ To disable this and always get notified:
   "suppressWhenFocused": false
 }
 ```
+
+## Minimum duration threshold
+
+You can suppress `complete` and `subagent_complete` notifications for short-lived sessions. Set `minDuration` to the number of seconds a session must exceed to trigger a done notification:
+
+```json
+{
+  "minDuration": 10
+}
+```
+
+With the above, if OpenCode finishes in under 10 seconds, no notification, sound, bell, or command is fired. Default is `0` (no threshold).
+
+This is independent of `command.minDuration`, which only controls whether the custom command runs.
 
 ### Platform support
 

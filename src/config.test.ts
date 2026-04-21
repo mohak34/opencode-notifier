@@ -277,6 +277,37 @@ describe("Config", () => {
     expect(config.suppressWhenFocused).toBe(false)
   })
 
+  test("loadConfig defaults minDuration to 0", async () => {
+    const { loadConfig } = await import("./config")
+    const config = loadConfig()
+
+    expect(config.minDuration).toBe(0)
+  })
+
+  test("loadConfig parses minDuration from config file", async () => {
+    const testConfig = {
+      minDuration: 10,
+    }
+    writeFileSync(testConfigPath, JSON.stringify(testConfig))
+
+    const { loadConfig } = await import("./config")
+    const config = loadConfig()
+
+    expect(config.minDuration).toBe(10)
+  })
+
+  test("loadConfig rejects negative minDuration", async () => {
+    const testConfig = {
+      minDuration: -5,
+    }
+    writeFileSync(testConfigPath, JSON.stringify(testConfig))
+
+    const { loadConfig } = await import("./config")
+    const config = loadConfig()
+
+    expect(config.minDuration).toBe(0)
+  })
+
   test("interpolateMessage substitutes {timestamp} placeholder", async () => {
     const { interpolateMessage } = await import("./config")
     const result = interpolateMessage("Event at {timestamp}", { timestamp: "14:30:05" })

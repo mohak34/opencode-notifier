@@ -56,6 +56,7 @@ export interface NotifierConfig {
   enableOnDesktop: boolean
   notificationSystem: "osascript" | "node-notifier" | "ghostty"
   linux: LinuxConfig
+  minDuration: number
   command: CommandConfig
   events: {
     permission: EventConfig
@@ -133,6 +134,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
   linux: {
     grouping: false,
   },
+  minDuration: 0,
   command: {
     enabled: false,
     path: "",
@@ -302,6 +304,10 @@ export function loadConfig(): NotifierConfig {
       linux: {
         grouping: typeof userConfig.linux?.grouping === "boolean" ? userConfig.linux.grouping : DEFAULT_CONFIG.linux.grouping,
       },
+      minDuration:
+        typeof userConfig.minDuration === "number" && Number.isFinite(userConfig.minDuration) && userConfig.minDuration >= 0
+          ? userConfig.minDuration
+          : DEFAULT_CONFIG.minDuration,
       command: {
         enabled: typeof userCommand.enabled === "boolean" ? userCommand.enabled : DEFAULT_CONFIG.command.enabled,
         path: typeof userCommand.path === "string" ? userCommand.path : DEFAULT_CONFIG.command.path,
