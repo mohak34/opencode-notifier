@@ -207,6 +207,26 @@ export function isTmuxPaneFocused(tmuxPane: string | null | undefined, probeResu
   return sessionAttached === "1" && windowActive === "1" && paneActive === "1"
 }
 
+export function isLinuxTerminalFocused(params: {
+  cachedWindowId: string | null
+  currentWindowId: string | null
+  wezTermPaneActive: boolean
+  tmuxPaneActive: boolean | null
+}): boolean {
+  const { cachedWindowId, currentWindowId, wezTermPaneActive, tmuxPaneActive } = params
+
+  if (!cachedWindowId) {
+    if (!wezTermPaneActive) return false
+    if (tmuxPaneActive !== null) return tmuxPaneActive
+    return false
+  }
+
+  if (currentWindowId !== cachedWindowId) return false
+  if (!wezTermPaneActive) return false
+  if (tmuxPaneActive !== null) return tmuxPaneActive
+  return true
+}
+
 function isTmuxPaneActive(): boolean {
   const tmuxPane = process.env.TMUX_PANE ?? null
   const result = execFileWithTimeout("tmux", ["display-message", "-t", tmuxPane ?? "", "-p", "#{session_attached} #{window_active} #{pane_active}"])
@@ -239,12 +259,13 @@ export function isTerminalFocused(): boolean {
       return true
     }
 
-    if (!cachedWindowId) return false
-    const currentId = getActiveWindowId()
-    if (currentId !== cachedWindowId) return false
-    if (!isWezTermPaneActive()) return false
-    if (process.env.TMUX) return isTmuxPaneActive()
-    return true
+    const tmuxPaneActive = process.env.TMUX ? isTmuxPaneActive() : null
+    return isLinuxTerminalFocused({
+      cachedWindowId,
+      currentWindowId: getActiveWindowId(),
+      wezTermPaneActive: isWezTermPaneActive(),
+      tmuxPaneActive,
+    })
   } catch {
     return false
   }

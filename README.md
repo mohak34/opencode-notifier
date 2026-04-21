@@ -381,7 +381,7 @@ To disable this and always get notified:
 
 **Unsupported compositors**: Wayland has no standard protocol for querying the focused window. Each compositor has its own IPC, and GNOME intentionally doesn't expose focus information. Unsupported compositors fall back to always notifying.
 
-**tmux/screen**: When running inside tmux, focus detection uses tmux pane state (`session_attached`, `window_active`, `pane_active`) via `tmux display-message`. This keeps suppression accurate when switching panes/windows/sessions. GNU Screen is not currently handled (falls back to always notifying).
+**tmux/screen**: When running inside tmux, focus detection uses tmux pane state (`session_attached`, `window_active`, `pane_active`) via `tmux display-message`. This keeps suppression accurate when switching panes/windows/sessions. On Linux setups where window focus cannot be detected at all, tmux pane state is also used as a best-effort fallback. GNU Screen is not currently handled (falls back to always notifying).
 
 **WezTerm panes**: When running in WezTerm with `WEZTERM_PANE` set, focus suppression is pane-aware via `wezterm cli list-clients --format json`. This means notifications are shown when you switch to a different WezTerm pane/tab.
 

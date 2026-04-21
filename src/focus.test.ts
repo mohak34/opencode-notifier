@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test"
-import { isMacTerminalAppFocused, isTmuxPaneFocused, parseWezTermFocusedPaneId } from "./focus"
+import { isLinuxTerminalFocused, isMacTerminalAppFocused, isTmuxPaneFocused, parseWezTermFocusedPaneId } from "./focus"
 
 describe("isMacTerminalAppFocused", () => {
   test("matches Terminal when TERM_PROGRAM is Apple_Terminal", () => {
@@ -72,6 +72,52 @@ describe("isTmuxPaneFocused", () => {
     expect(isTmuxPaneFocused("%1", "1 1 0")).toBe(false)
     expect(isTmuxPaneFocused("%1", "1 0 1")).toBe(false)
     expect(isTmuxPaneFocused("%1", "0 1 1")).toBe(false)
+  })
+})
+
+describe("isLinuxTerminalFocused", () => {
+  test("falls back to tmux pane state when window id is unavailable", () => {
+    expect(
+      isLinuxTerminalFocused({
+        cachedWindowId: null,
+        currentWindowId: null,
+        wezTermPaneActive: true,
+        tmuxPaneActive: true,
+      })
+    ).toBe(true)
+  })
+
+  test("does not suppress without tmux when window id is unavailable", () => {
+    expect(
+      isLinuxTerminalFocused({
+        cachedWindowId: null,
+        currentWindowId: null,
+        wezTermPaneActive: true,
+        tmuxPaneActive: null,
+      })
+    ).toBe(false)
+  })
+
+  test("does not suppress when wezterm pane is inactive", () => {
+    expect(
+      isLinuxTerminalFocused({
+        cachedWindowId: null,
+        currentWindowId: null,
+        wezTermPaneActive: false,
+        tmuxPaneActive: true,
+      })
+    ).toBe(false)
+  })
+
+  test("keeps existing window-id check when available", () => {
+    expect(
+      isLinuxTerminalFocused({
+        cachedWindowId: "123",
+        currentWindowId: "456",
+        wezTermPaneActive: true,
+        tmuxPaneActive: true,
+      })
+    ).toBe(false)
   })
 })
 
