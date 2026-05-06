@@ -7,6 +7,7 @@ import {
   isEventNotificationEnabled,
   isEventCommandEnabled,
   isEventBellEnabled,
+  isEventExternalNotificationEnabled,
   getMessage,
   getSoundPath,
   getSoundVolume,
@@ -19,6 +20,7 @@ import { sendNotification } from "./notify"
 import { playSound } from "./sound"
 import { ringBell } from "./bell"
 import { runCommand } from "./command"
+import { sendExternalNotifications } from "./external-notify"
 import { isTerminalFocused, focusTerminal, captureStartupWindowId, isKDEJumpBackSupported } from "./focus"
 import { shouldSuppressPermissionAlert, prunePermissionAlertState } from "./permission-dedupe"
 
@@ -196,6 +198,19 @@ async function handleEvent(
     const iconPath = getIconPath(config)
     const onNotificationClick = isKDEJumpBackSupported() ? () => void focusTerminal() : undefined
     promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping, onNotificationClick))
+  }
+
+  if (config.externalChannels.length > 0 && isEventExternalNotificationEnabled(config, eventType)) {
+    const title = getNotificationTitle(config, projectName)
+    // Always include session title in external notifications regardless of showSessionTitle
+    const externalMessage = interpolateMessage(rawMessage, {
+      sessionTitle,
+      agentName,
+      projectName,
+      timestamp,
+      turn,
+    })
+    promises.push(sendExternalNotifications(config.externalChannels, { title, message: externalMessage }))
   }
 
   if (isEventSoundEnabled(config, eventType)) {
@@ -460,7 +475,7 @@ async function handleEventWithElapsedTime(
   }
 
   let sessionTitle: string | null = preloadedSessionTitle ?? null
-  const shouldLookupSessionInfo = sessionID && !sessionTitle && (config.showSessionTitle || shouldResolveAgentNameForEvent(config, eventType))
+  const shouldLookupSessionInfo = sessionID && !sessionTitle && (config.showSessionTitle || config.externalChannels.length > 0 || shouldResolveAgentNameForEvent(config, eventType))
   if (shouldLookupSessionInfo) {
     const info = await getSessionInfo(client, sessionID)
     sessionTitle = info.title

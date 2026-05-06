@@ -185,13 +185,36 @@ describe("Config", () => {
   })
 
   test("loadConfig defaults new high-frequency events to sound only", async () => {
-    const { loadConfig, isEventSoundEnabled, isEventNotificationEnabled } = await import("./config")
+    const { loadConfig, isEventSoundEnabled, isEventNotificationEnabled, isEventExternalNotificationEnabled } = await import("./config")
     const config = loadConfig()
 
     expect(isEventSoundEnabled(config, "session_started")).toBe(true)
     expect(isEventNotificationEnabled(config, "session_started")).toBe(false)
+    expect(isEventExternalNotificationEnabled(config, "session_started")).toBe(false)
     expect(isEventSoundEnabled(config, "user_message")).toBe(true)
     expect(isEventNotificationEnabled(config, "user_message")).toBe(false)
+    expect(isEventExternalNotificationEnabled(config, "user_message")).toBe(false)
+    expect(isEventExternalNotificationEnabled(config, "client_connected")).toBe(false)
+    expect(isEventExternalNotificationEnabled(config, "user_cancelled")).toBe(false)
+    expect(isEventExternalNotificationEnabled(config, "subagent_complete")).toBe(false)
+  })
+
+  test("loadConfig defaults actionable events to externalNotification enabled", async () => {
+    const { loadConfig, isEventExternalNotificationEnabled } = await import("./config")
+    const config = loadConfig()
+
+    expect(isEventExternalNotificationEnabled(config, "permission")).toBe(true)
+    expect(isEventExternalNotificationEnabled(config, "complete")).toBe(true)
+    expect(isEventExternalNotificationEnabled(config, "error")).toBe(true)
+    expect(isEventExternalNotificationEnabled(config, "question")).toBe(true)
+    expect(isEventExternalNotificationEnabled(config, "interrupted")).toBe(true)
+    expect(isEventExternalNotificationEnabled(config, "plan_exit")).toBe(true)
+  })
+
+  test("loadConfig defaults high-frequency events to sound only (client_connected)", async () => {
+    const { loadConfig, isEventSoundEnabled, isEventNotificationEnabled } = await import("./config")
+    const config = loadConfig()
+
     expect(isEventSoundEnabled(config, "client_connected")).toBe(true)
     expect(isEventNotificationEnabled(config, "client_connected")).toBe(false)
   })

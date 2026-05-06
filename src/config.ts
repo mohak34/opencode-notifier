@@ -3,6 +3,7 @@ import { join, dirname } from "path"
 import { homedir } from "os"
 import { fileURLToPath } from "url"
 import isWsl from "is-wsl"
+import type { ExternalChannelConfig } from "./external-notify"
 
 export type EventType = 
   | "permission"
@@ -22,6 +23,8 @@ export interface EventConfig {
   notification: boolean
   command: boolean
   bell: boolean
+  /** Send to external channels (Gotify, Telegram, etc.). Default: true for most events. */
+  externalNotification: boolean
 }
 
 export interface CommandConfig {
@@ -58,6 +61,8 @@ export interface NotifierConfig {
   linux: LinuxConfig
   minDuration: number
   command: CommandConfig
+  /** External notification channels (Gotify, Telegram, etc.). Default: [] */
+  externalChannels: ExternalChannelConfig[]
   events: {
     permission: EventConfig
     complete: EventConfig
@@ -117,6 +122,7 @@ const DEFAULT_EVENT_CONFIG: EventConfig = {
   notification: true,
   command: true,
   bell: false,
+  externalNotification: true,
 }
 
 const DEFAULT_CONFIG: NotifierConfig = {
@@ -140,18 +146,19 @@ const DEFAULT_CONFIG: NotifierConfig = {
     path: "",
     minDuration: 0,
   },
+  externalChannels: [],
   events: {
     permission: { ...DEFAULT_EVENT_CONFIG },
     complete: { ...DEFAULT_EVENT_CONFIG },
-    subagent_complete: { ...DEFAULT_EVENT_CONFIG, sound: false, notification: false },
+    subagent_complete: { ...DEFAULT_EVENT_CONFIG, sound: false, notification: false, externalNotification: false },
     error: { ...DEFAULT_EVENT_CONFIG },
     question: { ...DEFAULT_EVENT_CONFIG },
     interrupted: { ...DEFAULT_EVENT_CONFIG },
-    user_cancelled: { ...DEFAULT_EVENT_CONFIG, sound: false, notification: false },
+    user_cancelled: { ...DEFAULT_EVENT_CONFIG, sound: false, notification: false, externalNotification: false },
     plan_exit: { ...DEFAULT_EVENT_CONFIG },
-    session_started: { ...DEFAULT_EVENT_CONFIG, notification: false },
-    user_message: { ...DEFAULT_EVENT_CONFIG, notification: false },
-    client_connected: { ...DEFAULT_EVENT_CONFIG, notification: false },
+    session_started: { ...DEFAULT_EVENT_CONFIG, notification: false, externalNotification: false },
+    user_message: { ...DEFAULT_EVENT_CONFIG, notification: false, externalNotification: false },
+    client_connected: { ...DEFAULT_EVENT_CONFIG, notification: false, externalNotification: false },
   },
   messages: {
     permission: "Session needs permission: {sessionTitle}",
@@ -207,7 +214,7 @@ export function getStatePath(): string {
 }
 
 function parseEventConfig(
-  userEvent: boolean | { sound?: boolean; notification?: boolean; command?: boolean; bell?: boolean } | undefined,
+  userEvent: boolean | { sound?: boolean; notification?: boolean; command?: boolean; bell?: boolean; externalNotification?: boolean } | undefined,
   defaultConfig: EventConfig
 ): EventConfig {
   if (userEvent === undefined) {
@@ -220,6 +227,7 @@ function parseEventConfig(
       notification: userEvent,
       command: userEvent,
       bell: defaultConfig.bell,
+      externalNotification: userEvent,
     }
   }
 
@@ -228,6 +236,7 @@ function parseEventConfig(
     notification: userEvent.notification ?? defaultConfig.notification,
     command: userEvent.command ?? defaultConfig.command,
     bell: userEvent.bell ?? defaultConfig.bell,
+    externalNotification: userEvent.externalNotification ?? defaultConfig.externalNotification,
   }
 }
 
@@ -245,6 +254,41 @@ function parseVolume(value: unknown, defaultVolume: number): number {
   }
 
   return value
+}
+
+function parseExternalChannels(raw: unknown): ExternalChannelConfig[] {
+  if (!Array.isArray(raw)) {
+    return []
+  }
+
+  const result: ExternalChannelConfig[] = []
+  for (const item of raw) {
+    if (item === null || typeof item !== "object") {
+      continue
+    }
+    const ch = item as Record<string, unknown>
+
+    if (ch.type === "gotify") {
+      if (typeof ch.url !== "string" || ch.url.length === 0) continue
+      if (typeof ch.token !== "string" || ch.token.length === 0) continue
+      result.push({
+        type: "gotify",
+        url: ch.url,
+        token: ch.token,
+        priority: typeof ch.priority === "number" ? ch.priority : undefined,
+      })
+    } else if (ch.type === "telegram") {
+      if (typeof ch.token !== "string" || ch.token.length === 0) continue
+      if (typeof ch.chatId !== "string" && typeof ch.chatId !== "number") continue
+      result.push({
+        type: "telegram",
+        token: ch.token,
+        chatId: ch.chatId as string | number,
+      })
+    }
+  }
+
+  return result
 }
 
 export function loadConfig(): NotifierConfig {
@@ -267,6 +311,7 @@ export function loadConfig(): NotifierConfig {
       notification: globalNotification,
       command: true,
       bell: globalBell,
+      externalNotification: true,
     }
 
     const userCommand = userConfig.command ?? {}
@@ -314,18 +359,19 @@ export function loadConfig(): NotifierConfig {
         args: commandArgs,
         minDuration: commandMinDuration,
       },
+      externalChannels: parseExternalChannels(userConfig.externalChannels),
       events: {
         permission: parseEventConfig(userConfig.events?.permission ?? userConfig.permission, defaultWithGlobal),
         complete: parseEventConfig(userConfig.events?.complete ?? userConfig.complete, defaultWithGlobal),
-        subagent_complete: parseEventConfig(userConfig.events?.subagent_complete ?? userConfig.subagent_complete, { sound: false, notification: false, command: true, bell: false }),
+        subagent_complete: parseEventConfig(userConfig.events?.subagent_complete ?? userConfig.subagent_complete, { sound: false, notification: false, command: true, bell: false, externalNotification: false }),
         error: parseEventConfig(userConfig.events?.error ?? userConfig.error, defaultWithGlobal),
         question: parseEventConfig(userConfig.events?.question ?? userConfig.question, defaultWithGlobal),
         interrupted: parseEventConfig(userConfig.events?.interrupted ?? userConfig.interrupted, defaultWithGlobal),
-        user_cancelled: parseEventConfig(userConfig.events?.user_cancelled ?? userConfig.user_cancelled, { sound: false, notification: false, command: true, bell: false }),
+        user_cancelled: parseEventConfig(userConfig.events?.user_cancelled ?? userConfig.user_cancelled, { sound: false, notification: false, command: true, bell: false, externalNotification: false }),
         plan_exit: parseEventConfig(userConfig.events?.plan_exit ?? userConfig.plan_exit, defaultWithGlobal),
-        session_started: parseEventConfig(userConfig.events?.session_started ?? userConfig.session_started, { ...defaultWithGlobal, notification: false }),
-        user_message: parseEventConfig(userConfig.events?.user_message ?? userConfig.user_message, { ...defaultWithGlobal, notification: false }),
-        client_connected: parseEventConfig(userConfig.events?.client_connected ?? userConfig.client_connected, { ...defaultWithGlobal, notification: false }),
+        session_started: parseEventConfig(userConfig.events?.session_started ?? userConfig.session_started, { ...defaultWithGlobal, notification: false, externalNotification: false }),
+        user_message: parseEventConfig(userConfig.events?.user_message ?? userConfig.user_message, { ...defaultWithGlobal, notification: false, externalNotification: false }),
+        client_connected: parseEventConfig(userConfig.events?.client_connected ?? userConfig.client_connected, { ...defaultWithGlobal, notification: false, externalNotification: false }),
       },
       messages: {
         permission: userConfig.messages?.permission ?? DEFAULT_CONFIG.messages.permission,
@@ -389,6 +435,10 @@ export function isEventCommandEnabled(config: NotifierConfig, event: EventType):
 
 export function isEventBellEnabled(config: NotifierConfig, event: EventType): boolean {
   return config.events[event].bell
+}
+
+export function isEventExternalNotificationEnabled(config: NotifierConfig, event: EventType): boolean {
+  return config.events[event].externalNotification
 }
 
 export function getMessage(config: NotifierConfig, event: EventType): string {
