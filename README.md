@@ -328,6 +328,61 @@ Run your own script when something happens. Use `{event}`, `{message}`, `{sessio
 }
 ```
 
+### External notification channels
+
+Send notifications to external services such as Gotify or Telegram. Channels are defined in the `externalChannels` array. By default the array is empty and no external notifications are sent.
+
+The notification content (title and message) mirrors what is shown in desktop notifications, including the session name and interruption reason.
+
+#### Gotify
+
+```json
+{
+  "externalChannels": [
+    {
+      "type": "gotify",
+      "url": "https://gotify.example.com",
+      "token": "your-app-token",
+      "priority": 5
+    }
+  ]
+}
+```
+
+- `url` - Base URL of your Gotify server
+- `token` - Application token created in the Gotify UI
+- `priority` - Message priority (optional, default `5`)
+
+#### Telegram
+
+```json
+{
+  "externalChannels": [
+    {
+      "type": "telegram",
+      "token": "123456:ABC-yourBotToken",
+      "chatId": "your-chat-id"
+    }
+  ]
+}
+```
+
+- `token` - Bot API token from [@BotFather](https://t.me/BotFather)
+- `chatId` - Chat, group, or channel ID to send messages to (find it with [@userinfobot](https://t.me/userinfobot))
+
+You can combine multiple channels of the same or different types:
+
+```json
+{
+  "externalChannels": [
+    { "type": "gotify", "url": "https://gotify.example.com", "token": "tok1" },
+    { "type": "telegram", "token": "123:abc", "chatId": "-100123456" }
+  ]
+}
+```
+
+Each channel is sent to in parallel. A failure in one channel is logged to stderr and does not affect the others.
+
 ## macOS: Pick your notification style
 
 **osascript** (default): Reliable but shows Script Editor icon

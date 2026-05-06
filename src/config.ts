@@ -3,6 +3,7 @@ import { join, dirname } from "path"
 import { homedir } from "os"
 import { fileURLToPath } from "url"
 import isWsl from "is-wsl"
+import type { ExternalChannelConfig } from "./external-notify"
 
 export type EventType = 
   | "permission"
@@ -58,6 +59,8 @@ export interface NotifierConfig {
   linux: LinuxConfig
   minDuration: number
   command: CommandConfig
+  /** External notification channels (Gotify, Telegram, etc.). Default: [] */
+  externalChannels: ExternalChannelConfig[]
   events: {
     permission: EventConfig
     complete: EventConfig
@@ -140,6 +143,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
     path: "",
     minDuration: 0,
   },
+  externalChannels: [],
   events: {
     permission: { ...DEFAULT_EVENT_CONFIG },
     complete: { ...DEFAULT_EVENT_CONFIG },
@@ -247,6 +251,41 @@ function parseVolume(value: unknown, defaultVolume: number): number {
   return value
 }
 
+function parseExternalChannels(raw: unknown): ExternalChannelConfig[] {
+  if (!Array.isArray(raw)) {
+    return []
+  }
+
+  const result: ExternalChannelConfig[] = []
+  for (const item of raw) {
+    if (item === null || typeof item !== "object") {
+      continue
+    }
+    const ch = item as Record<string, unknown>
+
+    if (ch.type === "gotify") {
+      if (typeof ch.url !== "string" || ch.url.length === 0) continue
+      if (typeof ch.token !== "string" || ch.token.length === 0) continue
+      result.push({
+        type: "gotify",
+        url: ch.url,
+        token: ch.token,
+        priority: typeof ch.priority === "number" ? ch.priority : undefined,
+      })
+    } else if (ch.type === "telegram") {
+      if (typeof ch.token !== "string" || ch.token.length === 0) continue
+      if (typeof ch.chatId !== "string" && typeof ch.chatId !== "number") continue
+      result.push({
+        type: "telegram",
+        token: ch.token,
+        chatId: ch.chatId as string | number,
+      })
+    }
+  }
+
+  return result
+}
+
 export function loadConfig(): NotifierConfig {
   const configPath = getConfigPath()
 
@@ -314,6 +353,7 @@ export function loadConfig(): NotifierConfig {
         args: commandArgs,
         minDuration: commandMinDuration,
       },
+      externalChannels: parseExternalChannels(userConfig.externalChannels),
       events: {
         permission: parseEventConfig(userConfig.events?.permission ?? userConfig.permission, defaultWithGlobal),
         complete: parseEventConfig(userConfig.events?.complete ?? userConfig.complete, defaultWithGlobal),

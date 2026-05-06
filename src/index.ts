@@ -19,6 +19,7 @@ import { sendNotification } from "./notify"
 import { playSound } from "./sound"
 import { ringBell } from "./bell"
 import { runCommand } from "./command"
+import { sendExternalNotifications } from "./external-notify"
 import { isTerminalFocused, focusTerminal, captureStartupWindowId, isKDEJumpBackSupported } from "./focus"
 import { shouldSuppressPermissionAlert, prunePermissionAlertState } from "./permission-dedupe"
 
@@ -196,6 +197,11 @@ async function handleEvent(
     const iconPath = getIconPath(config)
     const onNotificationClick = isKDEJumpBackSupported() ? () => void focusTerminal() : undefined
     promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping, onNotificationClick))
+  }
+
+  if (config.externalChannels.length > 0) {
+    const title = getNotificationTitle(config, projectName)
+    promises.push(sendExternalNotifications(config.externalChannels, { title, message }))
   }
 
   if (isEventSoundEnabled(config, eventType)) {
