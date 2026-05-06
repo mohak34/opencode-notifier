@@ -7,6 +7,7 @@ import {
   isEventNotificationEnabled,
   isEventCommandEnabled,
   isEventBellEnabled,
+  isEventExternalNotificationEnabled,
   getMessage,
   getSoundPath,
   getSoundVolume,
@@ -199,7 +200,7 @@ async function handleEvent(
     promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping, onNotificationClick))
   }
 
-  if (config.externalChannels.length > 0) {
+  if (config.externalChannels.length > 0 && isEventExternalNotificationEnabled(config, eventType)) {
     const title = getNotificationTitle(config, projectName)
     // Always include session title in external notifications regardless of showSessionTitle
     const externalMessage = interpolateMessage(rawMessage, {

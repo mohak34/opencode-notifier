@@ -23,6 +23,8 @@ export interface EventConfig {
   notification: boolean
   command: boolean
   bell: boolean
+  /** Send to external channels (Gotify, Telegram, etc.). Default: true for most events. */
+  externalNotification: boolean
 }
 
 export interface CommandConfig {
@@ -120,6 +122,7 @@ const DEFAULT_EVENT_CONFIG: EventConfig = {
   notification: true,
   command: true,
   bell: false,
+  externalNotification: true,
 }
 
 const DEFAULT_CONFIG: NotifierConfig = {
@@ -147,15 +150,15 @@ const DEFAULT_CONFIG: NotifierConfig = {
   events: {
     permission: { ...DEFAULT_EVENT_CONFIG },
     complete: { ...DEFAULT_EVENT_CONFIG },
-    subagent_complete: { ...DEFAULT_EVENT_CONFIG, sound: false, notification: false },
+    subagent_complete: { ...DEFAULT_EVENT_CONFIG, sound: false, notification: false, externalNotification: false },
     error: { ...DEFAULT_EVENT_CONFIG },
     question: { ...DEFAULT_EVENT_CONFIG },
     interrupted: { ...DEFAULT_EVENT_CONFIG },
-    user_cancelled: { ...DEFAULT_EVENT_CONFIG, sound: false, notification: false },
+    user_cancelled: { ...DEFAULT_EVENT_CONFIG, sound: false, notification: false, externalNotification: false },
     plan_exit: { ...DEFAULT_EVENT_CONFIG },
-    session_started: { ...DEFAULT_EVENT_CONFIG, notification: false },
-    user_message: { ...DEFAULT_EVENT_CONFIG, notification: false },
-    client_connected: { ...DEFAULT_EVENT_CONFIG, notification: false },
+    session_started: { ...DEFAULT_EVENT_CONFIG, notification: false, externalNotification: false },
+    user_message: { ...DEFAULT_EVENT_CONFIG, notification: false, externalNotification: false },
+    client_connected: { ...DEFAULT_EVENT_CONFIG, notification: false, externalNotification: false },
   },
   messages: {
     permission: "Session needs permission: {sessionTitle}",
@@ -211,7 +214,7 @@ export function getStatePath(): string {
 }
 
 function parseEventConfig(
-  userEvent: boolean | { sound?: boolean; notification?: boolean; command?: boolean; bell?: boolean } | undefined,
+  userEvent: boolean | { sound?: boolean; notification?: boolean; command?: boolean; bell?: boolean; externalNotification?: boolean } | undefined,
   defaultConfig: EventConfig
 ): EventConfig {
   if (userEvent === undefined) {
@@ -224,6 +227,7 @@ function parseEventConfig(
       notification: userEvent,
       command: userEvent,
       bell: defaultConfig.bell,
+      externalNotification: userEvent,
     }
   }
 
@@ -232,6 +236,7 @@ function parseEventConfig(
     notification: userEvent.notification ?? defaultConfig.notification,
     command: userEvent.command ?? defaultConfig.command,
     bell: userEvent.bell ?? defaultConfig.bell,
+    externalNotification: userEvent.externalNotification ?? defaultConfig.externalNotification,
   }
 }
 
@@ -306,6 +311,7 @@ export function loadConfig(): NotifierConfig {
       notification: globalNotification,
       command: true,
       bell: globalBell,
+      externalNotification: true,
     }
 
     const userCommand = userConfig.command ?? {}
@@ -357,15 +363,15 @@ export function loadConfig(): NotifierConfig {
       events: {
         permission: parseEventConfig(userConfig.events?.permission ?? userConfig.permission, defaultWithGlobal),
         complete: parseEventConfig(userConfig.events?.complete ?? userConfig.complete, defaultWithGlobal),
-        subagent_complete: parseEventConfig(userConfig.events?.subagent_complete ?? userConfig.subagent_complete, { sound: false, notification: false, command: true, bell: false }),
+        subagent_complete: parseEventConfig(userConfig.events?.subagent_complete ?? userConfig.subagent_complete, { sound: false, notification: false, command: true, bell: false, externalNotification: false }),
         error: parseEventConfig(userConfig.events?.error ?? userConfig.error, defaultWithGlobal),
         question: parseEventConfig(userConfig.events?.question ?? userConfig.question, defaultWithGlobal),
         interrupted: parseEventConfig(userConfig.events?.interrupted ?? userConfig.interrupted, defaultWithGlobal),
-        user_cancelled: parseEventConfig(userConfig.events?.user_cancelled ?? userConfig.user_cancelled, { sound: false, notification: false, command: true, bell: false }),
+        user_cancelled: parseEventConfig(userConfig.events?.user_cancelled ?? userConfig.user_cancelled, { sound: false, notification: false, command: true, bell: false, externalNotification: false }),
         plan_exit: parseEventConfig(userConfig.events?.plan_exit ?? userConfig.plan_exit, defaultWithGlobal),
-        session_started: parseEventConfig(userConfig.events?.session_started ?? userConfig.session_started, { ...defaultWithGlobal, notification: false }),
-        user_message: parseEventConfig(userConfig.events?.user_message ?? userConfig.user_message, { ...defaultWithGlobal, notification: false }),
-        client_connected: parseEventConfig(userConfig.events?.client_connected ?? userConfig.client_connected, { ...defaultWithGlobal, notification: false }),
+        session_started: parseEventConfig(userConfig.events?.session_started ?? userConfig.session_started, { ...defaultWithGlobal, notification: false, externalNotification: false }),
+        user_message: parseEventConfig(userConfig.events?.user_message ?? userConfig.user_message, { ...defaultWithGlobal, notification: false, externalNotification: false }),
+        client_connected: parseEventConfig(userConfig.events?.client_connected ?? userConfig.client_connected, { ...defaultWithGlobal, notification: false, externalNotification: false }),
       },
       messages: {
         permission: userConfig.messages?.permission ?? DEFAULT_CONFIG.messages.permission,
@@ -429,6 +435,10 @@ export function isEventCommandEnabled(config: NotifierConfig, event: EventType):
 
 export function isEventBellEnabled(config: NotifierConfig, event: EventType): boolean {
   return config.events[event].bell
+}
+
+export function isEventExternalNotificationEnabled(config: NotifierConfig, event: EventType): boolean {
+  return config.events[event].externalNotification
 }
 
 export function getMessage(config: NotifierConfig, event: EventType): string {
