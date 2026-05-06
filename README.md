@@ -431,6 +431,8 @@ tmux source-file ~/.tmux.conf
 
 When `suppressWhenFocused` is `true` (the default), notifications and sounds are skipped if the terminal running OpenCode is the active/focused window. The idea is simple: if you're already looking at it, you don't need an alert.
 
+This suppression also applies to external channels (Gotify, Telegram). If you want external channels to always fire even when the terminal is focused, set `suppressWhenFocused` to `false`:
+
 To disable this and always get notified:
 
 ```json

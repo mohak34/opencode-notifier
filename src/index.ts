@@ -201,7 +201,15 @@ async function handleEvent(
 
   if (config.externalChannels.length > 0) {
     const title = getNotificationTitle(config, projectName)
-    promises.push(sendExternalNotifications(config.externalChannels, { title, message }))
+    // Always include session title in external notifications regardless of showSessionTitle
+    const externalMessage = interpolateMessage(rawMessage, {
+      sessionTitle,
+      agentName,
+      projectName,
+      timestamp,
+      turn,
+    })
+    promises.push(sendExternalNotifications(config.externalChannels, { title, message: externalMessage }))
   }
 
   if (isEventSoundEnabled(config, eventType)) {
@@ -466,7 +474,7 @@ async function handleEventWithElapsedTime(
   }
 
   let sessionTitle: string | null = preloadedSessionTitle ?? null
-  const shouldLookupSessionInfo = sessionID && !sessionTitle && (config.showSessionTitle || shouldResolveAgentNameForEvent(config, eventType))
+  const shouldLookupSessionInfo = sessionID && !sessionTitle && (config.showSessionTitle || config.externalChannels.length > 0 || shouldResolveAgentNameForEvent(config, eventType))
   if (shouldLookupSessionInfo) {
     const info = await getSessionInfo(client, sessionID)
     sessionTitle = info.title
