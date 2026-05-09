@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.5] - 2026-05-09
+
+### Added
+- New `showFullPath` config option (#72)
+  - Set to `true` to show the full absolute path in notification titles and the `{projectName}` token
+  - Defaults to `false`, preserving the existing folder-name behavior
+  - Useful when working across multiple projects with the same folder name
+
 ## [0.2.4] - 2026-04-28
 
 ### Fixed
