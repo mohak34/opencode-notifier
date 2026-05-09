@@ -67,6 +67,7 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
   "bell": false,
   "timeout": 5,
   "showProjectName": true,
+  "showFullPath": false,
   "showSessionTitle": false,
   "showIcon": true,
   "customIconPath": null,
@@ -145,6 +146,7 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
   "bell": false,
   "timeout": 5,
   "showProjectName": true,
+  "showFullPath": false,
   "showSessionTitle": false,
   "showIcon": true,
   "suppressWhenFocused": true,
@@ -158,6 +160,7 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
 - `bell` - Emit terminal BEL (`\x07`) on events (default: false). Behavior depends on your terminal/WM settings
 - `timeout` - How long notifications show in seconds, Linux only (default: 5)
 - `showProjectName` - Show folder name in notification title (default: true)
+- `showFullPath` - Show full absolute path instead of folder name in notification title and `{projectName}` token (default: false). When true, shows `OpenCode (/home/user/projects/myapp)` instead of `OpenCode (myapp)`
 - `showSessionTitle` - Include the session title in notification messages via `{sessionTitle}` placeholder (default: false)
 - `showIcon` - Show OpenCode icon, Windows/Linux only (default: true)
 - `customIconPath` - Path to a custom icon for notifications. Useful on WSL where Windows paths are needed (default: null)

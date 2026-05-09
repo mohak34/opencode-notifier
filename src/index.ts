@@ -481,7 +481,7 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
   }
 
   const getConfig = () => loadConfig()
-  const projectName = directory ? basename(directory) : null
+  const projectName = directory ? (getConfig().showFullPath ? directory : basename(directory)) : null
 
   // Fire client_connected after the plugin is fully initialized.
   // There is no SDK event that reliably signals client connection from a plugin's

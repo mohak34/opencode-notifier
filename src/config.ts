@@ -49,6 +49,7 @@ export interface NotifierConfig {
   bell: boolean
   timeout: number
   showProjectName: boolean
+  showFullPath: boolean
   showSessionTitle: boolean
   showIcon: boolean
   customIconPath: string | null
@@ -125,6 +126,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
   bell: false,
   timeout: 5,
   showProjectName: true,
+  showFullPath: false,
   showSessionTitle: false,
   showIcon: true,
   customIconPath: null,
@@ -290,6 +292,7 @@ export function loadConfig(): NotifierConfig {
           ? userConfig.timeout
           : DEFAULT_CONFIG.timeout,
       showProjectName: userConfig.showProjectName ?? DEFAULT_CONFIG.showProjectName,
+      showFullPath: userConfig.showFullPath ?? DEFAULT_CONFIG.showFullPath,
       showSessionTitle: userConfig.showSessionTitle ?? DEFAULT_CONFIG.showSessionTitle,
       showIcon: userConfig.showIcon ?? DEFAULT_CONFIG.showIcon,
       customIconPath: userConfig.customIconPath ?? DEFAULT_CONFIG.customIconPath,
