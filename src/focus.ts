@@ -138,9 +138,9 @@ function getLinuxWaylandActiveWindowId(): string | null {
 
 function getWindowsActiveWindowId(): string | null {
   const script = `$type=Add-Type -Name FocusHelper -Namespace OpenCodeNotifier -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();' -PassThru; $type::GetForegroundWindow()`;
-  let windowId = execFileWithTimeout("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], 1000)
+  let windowId = execFileWithTimeout("powershell", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script], 1000)
   if (!windowId)
-    windowId = execFileWithTimeout("pwsh", ["-NoProfile", "-NonInteractive", "-Command", script], 1000)
+    windowId = execFileWithTimeout("pwsh", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script], 1000)
   return windowId
 }
 
