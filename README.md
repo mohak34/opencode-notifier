@@ -74,6 +74,7 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
   "suppressWhenFocused": true,
   "enableOnDesktop": false,
   "notificationSystem": "osascript",
+  "suppressGhosttySound": false,
   "linux": {
     "grouping": false
   },
@@ -151,7 +152,8 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
   "showIcon": true,
   "suppressWhenFocused": true,
   "enableOnDesktop": false,
-  "notificationSystem": "osascript"
+  "notificationSystem": "osascript",
+  "suppressGhosttySound": false
 }
 ```
 
@@ -167,6 +169,7 @@ Create `~/.config/opencode/opencode-notifier.json` with the defaults:
 - `suppressWhenFocused` - Skip notifications and sounds when the terminal is the active window (default: true). See [Focus detection](#focus-detection) for platform details
 - `enableOnDesktop` - Run the plugin on Desktop and Web clients (default: false). When false, the plugin only runs on CLI. Set to true if you want notifications/sounds/commands on Desktop/Web — useful if you want custom commands (Telegram, webhooks) but don't care about built-in notifications
 - `notificationSystem` - macOS only: `"osascript"`, `"node-notifier"`, or `"ghostty"` (default: "osascript"). Use `"ghostty"` if you're running Ghostty terminal for native OSC 9 notifications
+- `suppressGhosttySound` - macOS only: when `true` with `notificationSystem: "ghostty"`, skips the plugin's sound to avoid duplicating macOS Notification Center's default sound (default: false)
 - `minDuration` - Suppress `complete` and `subagent_complete` notifications when session finishes faster than this many seconds (default: 0). See [Minimum duration threshold](#minimum-duration-threshold)
 - `linux.grouping` - Linux only: replace notifications in-place instead of stacking (default: false). Requires `notify-send` 0.8+
 
@@ -362,6 +365,17 @@ If you're using [Ghostty](https://ghostty.org/) terminal, you can use its native
 ```
 
 This sends notifications directly through the terminal instead of using system notification tools. Works on any platform where Ghostty is running.
+
+**macOS:** Ghostty delivers notifications through macOS Notification Center, which plays its own default sound. This can result in duplicate audio with the plugin's sound effects. Set `suppressGhosttySound` to `true` to skip the plugin's sound:
+
+```json
+{
+  "notificationSystem": "ghostty",
+  "suppressGhosttySound": true
+}
+```
+
+Note: custom sounds configured via the `sounds` section still play — only default (bundled) sounds are suppressed.
 
 If you're using Ghostty inside tmux, enable passthrough in your tmux config so OSC 9 notifications can pass through:
 
