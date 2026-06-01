@@ -199,11 +199,14 @@ async function handleEvent(
     promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping, onNotificationClick))
   }
 
-  const ghosttyOnMac = process.platform === "darwin" && config.notificationSystem === "ghostty" && notificationEnabled
-  if (isEventSoundEnabled(config, eventType) && !ghosttyOnMac) {
+  if (isEventSoundEnabled(config, eventType)) {
     const customSoundPath = getSoundPath(config, eventType)
-    const soundVolume = getSoundVolume(config, eventType)
-    promises.push(playSound(eventType, customSoundPath, soundVolume))
+    const isDefaultSound = customSoundPath === null
+    const ghosttyOnMac = process.platform === "darwin" && config.notificationSystem === "ghostty" && notificationEnabled && isDefaultSound
+    if (!ghosttyOnMac) {
+      const soundVolume = getSoundVolume(config, eventType)
+      promises.push(playSound(eventType, customSoundPath, soundVolume))
+    }
   }
 
   if (isEventBellEnabled(config, eventType)) {
