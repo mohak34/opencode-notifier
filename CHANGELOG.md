@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.7] - 2026-05-21
+
+### Added
+- macOS: New `suppressGhosttySound` option to skip duplicate audio with Ghostty notifications (#78)
+  - Set to `true` to prevent the plugin's sound from playing alongside macOS Notification Center's default sound
+  - Only affects default (bundled) sounds — custom sounds still play
+  - Disabled by default for backward compatibility
+
 ## [0.2.6] - 2026-05-14
 
 ### Fixed
