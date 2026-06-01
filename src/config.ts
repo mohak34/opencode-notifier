@@ -56,6 +56,7 @@ export interface NotifierConfig {
   suppressWhenFocused: boolean
   enableOnDesktop: boolean
   notificationSystem: "osascript" | "node-notifier" | "ghostty"
+  suppressGhosttySound: boolean
   linux: LinuxConfig
   minDuration: number
   command: CommandConfig
@@ -133,6 +134,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
   suppressWhenFocused: true,
   enableOnDesktop: false,
   notificationSystem: "osascript",
+  suppressGhosttySound: false,
   linux: {
     grouping: false,
   },
@@ -304,6 +306,7 @@ export function loadConfig(): NotifierConfig {
           : userConfig.notificationSystem === "ghostty"
             ? "ghostty"
             : "osascript",
+      suppressGhosttySound: typeof userConfig.suppressGhosttySound === "boolean" ? userConfig.suppressGhosttySound : DEFAULT_CONFIG.suppressGhosttySound,
       linux: {
         grouping: typeof userConfig.linux?.grouping === "boolean" ? userConfig.linux.grouping : DEFAULT_CONFIG.linux.grouping,
       },

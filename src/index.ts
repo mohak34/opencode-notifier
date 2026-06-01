@@ -201,8 +201,7 @@ async function handleEvent(
 
   if (isEventSoundEnabled(config, eventType)) {
     const customSoundPath = getSoundPath(config, eventType)
-    const isDefaultSound = customSoundPath === null
-    const ghosttyOnMac = process.platform === "darwin" && config.notificationSystem === "ghostty" && notificationEnabled && isDefaultSound
+    const ghosttyOnMac = process.platform === "darwin" && config.notificationSystem === "ghostty" && notificationEnabled && config.suppressGhosttySound
     if (!ghosttyOnMac) {
       const soundVolume = getSoundVolume(config, eventType)
       promises.push(playSound(eventType, customSoundPath, soundVolume))
