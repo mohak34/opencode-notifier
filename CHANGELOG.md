@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.6] - 2026-05-14
+
+### Fixed
+- Windows: Hide PowerShell console window during focus checks (#77)
+  - Added `-WindowStyle Hidden` to `powershell`/`pwsh` spawns in `getWindowsActiveWindowId()`
+  - Prevents visible terminal flashes on every notification event
+- SSH: Skip notification if D-Bus session bus is unavailable (#73)
+  - Added `DBUS_SESSION_BUS_ADDRESS` check before calling `notify-send`
+  - Prevents 60-second hang when running over SSH without a desktop session
+
 ## [0.2.5] - 2026-05-09
 
 ### Added
