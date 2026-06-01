@@ -191,14 +191,16 @@ async function handleEvent(
     turn,
   })
 
-  if (isEventNotificationEnabled(config, eventType)) {
+  const notificationEnabled = isEventNotificationEnabled(config, eventType)
+  if (notificationEnabled) {
     const title = getNotificationTitle(config, projectName)
     const iconPath = getIconPath(config)
     const onNotificationClick = isKDEJumpBackSupported() ? () => void focusTerminal() : undefined
     promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping, onNotificationClick))
   }
 
-  if (isEventSoundEnabled(config, eventType)) {
+  const ghosttyOnMac = process.platform === "darwin" && config.notificationSystem === "ghostty" && notificationEnabled
+  if (isEventSoundEnabled(config, eventType) && !ghosttyOnMac) {
     const customSoundPath = getSoundPath(config, eventType)
     const soundVolume = getSoundVolume(config, eventType)
     promises.push(playSound(eventType, customSoundPath, soundVolume))
