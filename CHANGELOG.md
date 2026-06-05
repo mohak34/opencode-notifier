@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.2.8-beta.0] - 2026-06-05
+## [0.2.8] - 2026-06-05
 
 ### Fixed
 - Windows: PowerShell `-WindowStyle Hidden` no longer minimizes the parent terminal (#80)
