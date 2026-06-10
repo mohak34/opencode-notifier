@@ -47,6 +47,7 @@ async function runCommand(command: string, args: string[]): Promise<void> {
     const proc = spawn(command, args, {
       stdio: "ignore",
       detached: false,
+      windowsHide: true,
     })
 
     proc.on("error", (err) => {
@@ -113,7 +114,7 @@ async function playOnMac(soundPath: string, volume: number): Promise<void> {
 
 async function playOnWindows(soundPath: string): Promise<void> {
   const script = `& { (New-Object Media.SoundPlayer $args[0]).PlaySync() }`
-  await runCommand("powershell", ["-c", script, soundPath])
+  await runCommand("powershell", ["-NoProfile", "-NonInteractive", "-Command", script, soundPath])
 }
 
 export async function playSound(

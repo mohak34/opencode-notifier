@@ -22,6 +22,7 @@ export function runCommand(config: NotifierConfig, event: EventType, message: st
   const proc = spawn(command, args, {
     stdio: "ignore",
     detached: true,
+    windowsHide: true,
   })
 
   proc.on("error", () => {})

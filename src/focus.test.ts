@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test"
-import { isLinuxTerminalFocused, isMacTerminalAppFocused, isTmuxPaneFocused, parseWezTermFocusedPaneId, isKDEJumpBackSupported, captureStartupWindowId, focusTerminal, getCachedWindowTitle } from "./focus"
+import { isLinuxTerminalFocused, isMacTerminalAppFocused, isTmuxPaneFocused, parseWezTermFocusedPaneId, isKDEJumpBackSupported, captureStartupWindowId, focusTerminal, getCachedWindowTitle, isWindowsTerminalFocused } from "./focus"
 
 describe("isMacTerminalAppFocused", () => {
   test("matches Terminal when TERM_PROGRAM is Apple_Terminal", () => {
@@ -123,6 +123,14 @@ describe("isLinuxTerminalFocused", () => {
         tmuxPaneActive: true,
       })
     ).toBe(false)
+  })
+})
+
+describe("isWindowsTerminalFocused", () => {
+  test("matches startup and current foreground window ids", () => {
+    expect(isWindowsTerminalFocused({ cachedWindowId: "123", currentWindowId: "123" })).toBe(true)
+    expect(isWindowsTerminalFocused({ cachedWindowId: "123", currentWindowId: "456" })).toBe(false)
+    expect(isWindowsTerminalFocused({ cachedWindowId: null, currentWindowId: "123" })).toBe(false)
   })
 })
 

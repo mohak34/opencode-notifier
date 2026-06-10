@@ -271,6 +271,14 @@ export function isLinuxTerminalFocused(params: {
   return true
 }
 
+export function isWindowsTerminalFocused(params: {
+  cachedWindowId: string | null
+  currentWindowId: string | null
+}): boolean {
+  const { cachedWindowId, currentWindowId } = params
+  return !!cachedWindowId && currentWindowId === cachedWindowId
+}
+
 function isTmuxPaneActive(): boolean {
   const tmuxPane = process.env.TMUX_PANE ?? null
   const result = execFileWithTimeout("tmux", ["display-message", "-t", tmuxPane ?? "", "-p", "#{session_attached} #{window_active} #{pane_active}"])
@@ -301,6 +309,13 @@ export function isTerminalFocused(): boolean {
         return isTmuxPaneActive()
       }
       return true
+    }
+
+    if (process.platform === "win32") {
+      return isWindowsTerminalFocused({
+        cachedWindowId,
+        currentWindowId: getWindowsActiveWindowId(),
+      })
     }
 
     const tmuxPaneActive = process.env.TMUX ? isTmuxPaneActive() : null
