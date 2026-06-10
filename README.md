@@ -468,24 +468,48 @@ The action button is only enabled on Linux KDE sessions where `kdotool` is avail
 
 ## Updating
 
-If Opencode does not update the plugin or there is an issue with the cache version:
+OpenCode caches plugin packages under `~/.cache/opencode`. If you switch between `latest`, `beta`, or a pinned version and OpenCode still uses the old plugin, close OpenCode and remove the cached package.
+
+Linux/macOS:
 
 ```bash
-# Linux/macOS
-rm -rf ~/.cache/opencode/packages/@mohak34/opencode-notifier@beta
+rm -rf ~/.cache/opencode/packages/@mohak34/opencode-notifier*
 rm -rf ~/.cache/opencode/node_modules/@mohak34/opencode-notifier
-
-# Windows
-Remove-Item -Recurse -Force "$env:USERPROFILE\.cache\opencode\packages\@mohak34\opencode-notifier@beta"
-Remove-Item -Recurse -Force "$env:USERPROFILE\.cache\opencode\node_modules\@mohak34\opencode-notifier"
+rm -f ~/.cache/opencode/bun.lock
 ```
 
-Then restart OpenCode.
+Windows PowerShell:
 
-Verify installation:
+```powershell
+Remove-Item -Recurse -Force "$env:USERPROFILE\.cache\opencode\packages\@mohak34\opencode-notifier*" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "$env:USERPROFILE\.cache\opencode\node_modules\@mohak34\opencode-notifier" -ErrorAction SilentlyContinue
+Remove-Item -Force "$env:USERPROFILE\.cache\opencode\bun.lock" -ErrorAction SilentlyContinue
+```
+
+Then reopen OpenCode. It will download the plugin again.
+
+To avoid cache confusion while testing, pin the exact version in `opencode.json` instead of using a moving tag:
+
+```json
+{
+  "plugin": ["@mohak34/opencode-notifier@x.y.z"]
+}
+```
+
+Check the version published under a tag:
+
 ```bash
-cat ~/.cache/opencode/packages/@mohak34/opencode-notifier@beta/node_modules/@mohak34/opencode-notifier/package.json | grep version
+npm view @mohak34/opencode-notifier@latest version
+npm view @mohak34/opencode-notifier@beta version
 ```
+
+Check the version OpenCode cached:
+
+```bash
+cat ~/.cache/opencode/packages/@mohak34/opencode-notifier@latest/node_modules/@mohak34/opencode-notifier/package.json | grep version
+```
+
+If you use `@beta` or a pinned version, replace `latest` in the path with `beta` or the exact version, for example `0.2.9-beta.0`.
 
 ## Troubleshooting
 
@@ -593,10 +617,11 @@ This is a known Bun issue on Windows. Disable native notifications and use Power
 
 - Check `suppressWhenFocused`: when `true` (default), notifications are skipped while OpenCode terminal is focused. Set to `false` to always notify.
 - Check `enableOnDesktop`: defaults to `false`, so the plugin won't run on Desktop/Web clients. Set to `true` if you need it there.
-- Verify the package is actually cached:
+- Verify the package version OpenCode cached:
   ```bash
-  cat ~/.cache/opencode/packages/@mohak34/opencode-notifier@beta/node_modules/@mohak34/opencode-notifier/package.json | grep version
+  cat ~/.cache/opencode/packages/@mohak34/opencode-notifier@latest/node_modules/@mohak34/opencode-notifier/package.json | grep version
   ```
+  If you use `@beta` or a pinned version, replace `latest` in the path with `beta` or the exact version.
 
 ## Changelog
 
