@@ -85,7 +85,7 @@ function incrementTurnCount(): number {
 }
 
 // Memory cleanup: Remove old session entries every 5 minutes to prevent leaks
-setInterval(() => {
+const cleanupInterval = setInterval(() => {
   const cutoff = Date.now() - 5 * 60 * 1000 // 5 minutes ago
 
   // Clean up sessionIdleSequence (use last access time stored separately if needed)
@@ -114,6 +114,7 @@ setInterval(() => {
 
   prunePermissionAlertState(cutoff)
 }, 5 * 60 * 1000)
+cleanupInterval.unref()
 
 function getNotificationTitle(config: NotifierConfig, projectName: string | null): string {
   if (config.showProjectName && projectName) {
@@ -491,9 +492,15 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
   // There is no SDK event that reliably signals client connection from a plugin's
   // perspective, so we approximate it with a short delay after plugin startup.
   // Config is read at fire-time so that any user overrides are respected.
-  setTimeout(() => {
+  // CLI sessions skip the delay since the process may exit before it fires.
+  const isCLI = !clientEnv || clientEnv === "cli"
+  if (isCLI) {
     void handleEvent(getConfig(), "client_connected", projectName, null)
-  }, 100)
+  } else {
+    setTimeout(() => {
+      void handleEvent(getConfig(), "client_connected", projectName, null)
+    }, 100)
+  }
 
   return {
     event: async ({ event }) => {
@@ -534,7 +541,16 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
       if (event.type === "session.idle") {
         const sessionID = getSessionIDFromEvent(event)
         if (sessionID) {
-          scheduleSessionIdle(client, config, projectName, event, sessionID)
+          if (isCLI) {
+            // CLI sessions (opencode run) exit soon after going idle.
+            // Process completion directly to avoid losing the notification
+            // when the process terminates before the debounce timer fires.
+            const idleReceivedAtMs = Date.now()
+            const sequence = bumpSessionIdleSequence(sessionID)
+            await processSessionIdle(client, config, projectName, event, sessionID, sequence, idleReceivedAtMs)
+          } else {
+            scheduleSessionIdle(client, config, projectName, event, sessionID)
+          }
         } else {
           await handleEventWithElapsedTime(client, config, "complete", projectName, event)
         }
