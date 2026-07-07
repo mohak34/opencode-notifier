@@ -1,5 +1,5 @@
 import os from "os"
-import { exec, execFile, spawn } from "child_process"
+import { execFile, spawn } from "child_process"
 import notifier from "node-notifier"
 import isWsl from "is-wsl"
 
@@ -228,6 +228,15 @@ export function parseNotifySendOutputLine(
   return null
 }
 
+export function buildOsascriptNotificationArgs(title: string, message: string): string[] {
+  return [
+    "-e",
+    "on run argv\n display notification (item 1 of argv) with title (item 2 of argv)\nend run",
+    message,
+    title,
+  ]
+}
+
 export async function sendNotification(
   title: string,
   message: string,
@@ -272,14 +281,9 @@ export async function sendNotification(
     }
 
     return new Promise((resolve) => {
-      const escapedMessage = message.replace(/"/g, '\\"')
-      const escapedTitle = title.replace(/"/g, '\\"')
-      exec(
-        `osascript -e 'display notification "${escapedMessage}" with title "${escapedTitle}"'`,
-        () => {
-          resolve()
-        }
-      )
+      execFile("osascript", buildOsascriptNotificationArgs(title, message), () => {
+        resolve()
+      })
     })
   }
 
