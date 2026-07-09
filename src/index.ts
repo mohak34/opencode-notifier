@@ -195,7 +195,7 @@ async function handleEvent(
   if (notificationEnabled) {
     const title = getNotificationTitle(config, projectName)
     const iconPath = getIconPath(config)
-    const onNotificationClick = isKDEJumpBackSupported() ? () => void focusTerminal() : undefined
+    const onNotificationClick = process.platform !== "win32" ? () => void focusTerminal() : undefined
     promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping, onNotificationClick))
   }
 

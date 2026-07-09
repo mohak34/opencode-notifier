@@ -260,11 +260,15 @@ export async function sendNotification(
           message: message,
           timeout: timeout,
           icon: iconPath,
+          wait: true,
         }
 
         notifier.notify(
           notificationOptions,
-          () => {
+          (err: any, response: any, metadata: any) => {
+            if (!err && onClick && metadata?.activationType !== "timeout") {
+              onClick()
+            }
             resolve()
           }
         )
