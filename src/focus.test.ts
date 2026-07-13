@@ -127,10 +127,93 @@ describe("isLinuxTerminalFocused", () => {
 })
 
 describe("isWindowsTerminalFocused", () => {
-  test("matches startup and current foreground window ids", () => {
-    expect(isWindowsTerminalFocused({ cachedWindowId: "123", currentWindowId: "123" })).toBe(true)
-    expect(isWindowsTerminalFocused({ cachedWindowId: "123", currentWindowId: "456" })).toBe(false)
-    expect(isWindowsTerminalFocused({ cachedWindowId: null, currentWindowId: "123" })).toBe(false)
+  test("matches Windows Terminal by class name", () => {
+    expect(isWindowsTerminalFocused({ className: "CASCADIA_HOSTING_WINDOW_CLASS", processName: null })).toBe(true)
+  })
+
+  test("matches Windows Terminal by process name", () => {
+    expect(isWindowsTerminalFocused({ className: null, processName: "WindowsTerminal" })).toBe(true)
+  })
+
+  test("matches conhost by class name", () => {
+    expect(isWindowsTerminalFocused({ className: "ConsoleWindowClass", processName: null })).toBe(true)
+  })
+
+  test("matches conhost by process name", () => {
+    expect(isWindowsTerminalFocused({ className: null, processName: "conhost" })).toBe(true)
+  })
+
+  test("matches Alacritty by process name", () => {
+    expect(isWindowsTerminalFocused({ className: null, processName: "alacritty" })).toBe(true)
+  })
+
+  test("matches WezTerm by process name", () => {
+    expect(isWindowsTerminalFocused({ className: null, processName: "wezterm" })).toBe(true)
+  })
+
+  test("matches VS Code by process name", () => {
+    expect(isWindowsTerminalFocused({ className: null, processName: "Code" })).toBe(true)
+  })
+
+  test("matches cursor by process name", () => {
+    expect(isWindowsTerminalFocused({ className: null, processName: "cursor" })).toBe(true)
+  })
+
+  test("returns false for non-terminal class and process", () => {
+    expect(isWindowsTerminalFocused({ className: "Chrome_WidgetWin_1", processName: "chrome" })).toBe(false)
+  })
+
+  test("returns false when both are null", () => {
+    expect(isWindowsTerminalFocused({ className: null, processName: null })).toBe(false)
+  })
+
+  test("is case insensitive", () => {
+    expect(isWindowsTerminalFocused({ className: "CASCADIA_HOSTING_WINDOW_CLASS", processName: null })).toBe(true)
+    expect(isWindowsTerminalFocused({ className: "cascadia_hosting_window_class", processName: null })).toBe(true)
+    expect(isWindowsTerminalFocused({ className: null, processName: "WindowsTerminal" })).toBe(true)
+    expect(isWindowsTerminalFocused({ className: null, processName: "windowsterminal" })).toBe(true)
+  })
+
+  test("matches when either class or process name matches", () => {
+    expect(isWindowsTerminalFocused({ className: "CASCADIA_HOSTING_WINDOW_CLASS", processName: "chrome" })).toBe(true)
+    expect(isWindowsTerminalFocused({ className: "Chrome_WidgetWin_1", processName: "WindowsTerminal" })).toBe(true)
+  })
+})
+
+describe("getWindowsActiveWindowInfo on Windows", () => {
+  test("PowerShell command produces valid 'class|process' output", () => {
+    // Only run this test on Windows (the P/Invoke won't work elsewhere)
+    // This is an integration test that verifies the actual PowerShell command
+    // works correctly — catches Win32 API issues, CLIXML problems, etc.
+    const { execFileSync } = require("child_process")
+    const script = `
+$p=Add-Type -Name NFI_Test -Namespace OpenCodeNotifier -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();[DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetClassName(IntPtr h,System.Text.StringBuilder b,int n);[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);' -PassThru;
+$h=$p::GetForegroundWindow();
+if(!$h){Write-Output 'null|null';return}
+$sb=New-Object System.Text.StringBuilder 256;
+$p::GetClassName($h,$sb,256)|Out-Null;
+$c=$sb.ToString();
+$procId=0;
+$p::GetWindowThreadProcessId($h,[ref]$procId)|Out-Null;
+try{$pn=(Get-Process -Id $procId -ErrorAction SilentlyContinue).ProcessName}catch{}
+if(!$pn){$pn=''}
+Write-Output "$c|$pn"
+`.trim().replace(/\n/g, "; ")
+
+    const result = execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5000,
+      windowsHide: true,
+    }).trim()
+
+    // The result must contain '|' and must have a non-empty process name
+    expect(result).toContain("|")
+    const [className, processName] = result.split("|")
+    expect(className).toBeTruthy()
+    expect(processName).toBeTruthy()
+    // Class name should be a real Windows window class (at least 3 chars)
+    expect(className.length).toBeGreaterThan(2)
   })
 })
 
