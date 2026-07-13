@@ -196,7 +196,7 @@ async function handleEvent(
     const title = getNotificationTitle(config, projectName)
     const iconPath = getIconPath(config)
     const onNotificationClick = isKDEJumpBackSupported() ? () => void focusTerminal() : undefined
-    promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping, onNotificationClick))
+    promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping, onNotificationClick, config.windows.appID))
   }
 
   if (isEventSoundEnabled(config, eventType)) {
