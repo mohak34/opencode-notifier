@@ -1,5 +1,9 @@
 import { describe, test, expect } from "bun:test"
-import { formatGhosttyNotificationSequence, parseNotifySendOutputLine } from "./notify"
+import {
+  buildOsascriptNotificationArgs,
+  formatGhosttyNotificationSequence,
+  parseNotifySendOutputLine,
+} from "./notify"
 
 describe("formatGhosttyNotificationSequence", () => {
   test("returns plain OSC 9 outside tmux", () => {
@@ -36,5 +40,22 @@ describe("parseNotifySendOutputLine", () => {
     expect(parseNotifySendOutputLine("0")).toEqual({ type: "id", id: 0 })
     expect(parseNotifySendOutputLine("Focus")).toBeNull()
     expect(parseNotifySendOutputLine("random")).toBeNull()
+  })
+})
+
+describe("buildOsascriptNotificationArgs", () => {
+  test("passes title and message as argv instead of interpolating them into the script", () => {
+    const title = "OpenCode (project ' name)"
+    const message = "done with $(shell-like text)"
+
+    const args = buildOsascriptNotificationArgs(title, message)
+
+    expect(args[0]).toBe("-e")
+    expect(args[1]).toContain("item 1 of argv")
+    expect(args[1]).toContain("item 2 of argv")
+    expect(args[1]).not.toContain(title)
+    expect(args[1]).not.toContain(message)
+    expect(args[2]).toBe(message)
+    expect(args[3]).toBe(title)
   })
 })
