@@ -203,6 +203,13 @@ function getExpectedMacTerminalAppNames(env: NodeJS.ProcessEnv): Set<string> {
   return new Set(MAC_TERMINAL_APP_NAMES)
 }
 
+export function buildOsascriptActivateAppArgs(appName: string): string[] {
+  return [
+    "-e",
+    `tell application "${appName}" to activate`,
+  ]
+}
+
 export function isMacTerminalAppFocused(frontmostAppName: string | null, env: NodeJS.ProcessEnv = process.env): boolean {
   if (!frontmostAppName) {
     return false
@@ -739,12 +746,12 @@ export async function focusTerminal(): Promise<void> {
       const expectedApps = getExpectedMacTerminalAppNames(process.env)
       for (const app of expectedApps) {
         try {
-          execSync(`osascript -e 'tell application "${app}" to activate' 2>/dev/null`, { timeout: 1000 })
+          execFileSync("osascript", buildOsascriptActivateAppArgs(app), { timeout: 1000, stdio: "ignore" })
           return
         } catch {
         }
       }
-      execSync(`osascript -e 'tell application "Terminal" to activate' 2>/dev/null`, { timeout: 1000 })
+      execFileSync("osascript", buildOsascriptActivateAppArgs("Terminal"), { timeout: 1000, stdio: "ignore" })
     } catch {
     }
     return

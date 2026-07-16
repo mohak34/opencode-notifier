@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test"
-import { isLinuxTerminalFocused, isMacTerminalAppFocused, isTmuxPaneFocused, parseWezTermFocusedPaneId, isKDEJumpBackSupported, captureStartupWindowId, focusTerminal, getCachedWindowTitle, isWindowsTerminalFocused } from "./focus"
+import { isLinuxTerminalFocused, isMacTerminalAppFocused, isTmuxPaneFocused, parseWezTermFocusedPaneId, isKDEJumpBackSupported, captureStartupWindowId, focusTerminal, getCachedWindowTitle, isWindowsTerminalFocused, buildOsascriptActivateAppArgs } from "./focus"
 
 describe("isMacTerminalAppFocused", () => {
   test("matches Terminal when TERM_PROGRAM is Apple_Terminal", () => {
@@ -208,5 +208,14 @@ describe("captureStartupWindowId", () => {
 describe("focusTerminal", () => {
   test("does not throw on unsupported platforms", async () => {
     await expect(focusTerminal()).resolves.toBeUndefined()
+  })
+})
+
+describe("buildOsascriptActivateAppArgs", () => {
+  test("passes the app name into the script arg instead of shell interpolation", () => {
+    const appName = `App';touch pwned;'`
+    const args = buildOsascriptActivateAppArgs(appName)
+    expect(args[0]).toBe("-e")
+    expect(args[1]).toBe(`tell application "${appName}" to activate`)
   })
 })
