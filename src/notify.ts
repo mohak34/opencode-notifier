@@ -244,7 +244,8 @@ export async function sendNotification(
   iconPath?: string,
   notificationSystem: "osascript" | "node-notifier" | "ghostty" = "osascript",
   linuxGrouping: boolean = true,
-  onClick?: () => void
+  onClick?: () => void,
+  windowsAppID?: string
 ): Promise<void> {
   const now = Date.now()
   if (lastNotificationTime[message] && now - lastNotificationTime[message] < DEBOUNCE_MS) {
@@ -321,7 +322,7 @@ export async function sendNotification(
       message: message,
       timeout: timeout,
       icon: iconPath,
-      "app-name": "opencode",
+      "app-name": windowsAppID ?? "opencode",
     }
 
     platformNotifier.notify(

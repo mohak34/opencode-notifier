@@ -35,6 +35,10 @@ export interface LinuxConfig {
   grouping: boolean
 }
 
+export interface WindowsConfig {
+  appID: string
+}
+
 export interface MessageContext {
   sessionTitle?: string | null
   agentName?: string | null
@@ -58,6 +62,7 @@ export interface NotifierConfig {
   notificationSystem: "osascript" | "node-notifier" | "ghostty"
   suppressGhosttySound: boolean
   linux: LinuxConfig
+  windows: WindowsConfig
   minDuration: number
   command: CommandConfig
   events: {
@@ -137,6 +142,9 @@ const DEFAULT_CONFIG: NotifierConfig = {
   suppressGhosttySound: false,
   linux: {
     grouping: false,
+  },
+  windows: {
+    appID: "opencode",
   },
   minDuration: 0,
   command: {
@@ -309,6 +317,11 @@ export function loadConfig(): NotifierConfig {
       suppressGhosttySound: typeof userConfig.suppressGhosttySound === "boolean" ? userConfig.suppressGhosttySound : DEFAULT_CONFIG.suppressGhosttySound,
       linux: {
         grouping: typeof userConfig.linux?.grouping === "boolean" ? userConfig.linux.grouping : DEFAULT_CONFIG.linux.grouping,
+      },
+      windows: {
+        appID: typeof userConfig.windows?.appID === "string" && userConfig.windows.appID.length > 0
+          ? userConfig.windows.appID
+          : DEFAULT_CONFIG.windows.appID,
       },
       minDuration:
         typeof userConfig.minDuration === "number" && Number.isFinite(userConfig.minDuration) && userConfig.minDuration >= 0
