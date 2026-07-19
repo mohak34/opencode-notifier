@@ -179,19 +179,18 @@ Write-Output "$c|$pn"
   if (!output)
     output = execFileWithTimeout("pwsh", ["-NoProfile", "-NonInteractive", "-Command", script], 1000)
   if (!output) return null
-  const sep = output.indexOf("|")
+  // PowerShell may prepend a CLIXML marker/warning line to stdout; drop it so
+  // the "class|process" parse stays correct.
+  const line = output
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.length > 0 && !l.startsWith("#<"))
+  if (!line) return null
+  const sep = line.indexOf("|")
   if (sep === -1) return null
-  const className = output.substring(0, sep) || null
-  const processName = output.substring(sep + 1) || null
+  const className = line.substring(0, sep) || null
+  const processName = line.substring(sep + 1) || null
   return { className, processName }
-}
-
-function isWindowsTerminalForeground(): boolean {
-  const info = getWindowsActiveWindowInfo()
-  if (!info) return false
-  const className = info.className?.toLowerCase() ?? ""
-  const processName = info.processName?.toLowerCase() ?? ""
-  return WINDOWS_TERMINAL_WINDOW_CLASSES.has(className) || WINDOWS_TERMINAL_PROCESS_NAMES.has(processName)
 }
 
 function getMacOSActiveWindowId(): string | null {

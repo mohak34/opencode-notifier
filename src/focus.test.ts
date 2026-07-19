@@ -201,12 +201,19 @@ if(!$pn){$pn=''}
 Write-Output "$c|$pn"
 `.trim().replace(/\n/g, "; ")
 
-    const result = execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], {
+    const raw = execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "ignore"],
       timeout: 5000,
       windowsHide: true,
     }).trim()
+
+    // PowerShell may prepend a CLIXML marker/warning line; ignore it, same as
+    // the production parser.
+    const result = raw
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => l.length > 0 && !l.startsWith("#<")) ?? raw
 
     // The result must contain '|' and must have a non-empty process name
     expect(result).toContain("|")
