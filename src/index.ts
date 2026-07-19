@@ -24,6 +24,10 @@ import { shouldSuppressPermissionAlert, prunePermissionAlertState } from "./perm
 
 const IDLE_COMPLETE_DELAY_MS = 350
 
+export function isCLIClient(clientEnv?: string): boolean {
+  return !clientEnv || clientEnv === "cli"
+}
+
 const pendingIdleTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const sessionIdleSequence = new Map<string, number>()
 const sessionErrorSuppressionAt = new Map<string, number>()
@@ -493,7 +497,7 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
   // perspective, so we approximate it with a short delay after plugin startup.
   // Config is read at fire-time so that any user overrides are respected.
   // CLI sessions skip the delay since the process may exit before it fires.
-  const isCLI = !clientEnv || clientEnv === "cli"
+  const isCLI = isCLIClient(clientEnv)
   if (isCLI) {
     void handleEvent(getConfig(), "client_connected", projectName, null)
   } else {
