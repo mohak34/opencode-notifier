@@ -185,6 +185,7 @@ describe("getWindowsActiveWindowInfo on Windows", () => {
     // Only run this test on Windows (the P/Invoke won't work elsewhere)
     // This is an integration test that verifies the actual PowerShell command
     // works correctly — catches Win32 API issues, CLIXML problems, etc.
+    if (process.platform !== "win32") return
     const { execFileSync } = require("child_process")
     const script = `
 $p=Add-Type -Name NFI_Test -Namespace OpenCodeNotifier -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();[DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetClassName(IntPtr h,System.Text.StringBuilder b,int n);[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);' -PassThru;

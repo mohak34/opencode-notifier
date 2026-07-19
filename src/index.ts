@@ -19,7 +19,7 @@ import { sendNotification } from "./notify"
 import { playSound } from "./sound"
 import { ringBell } from "./bell"
 import { runCommand } from "./command"
-import { isTerminalFocused, focusTerminal, captureStartupWindowId, isKDEJumpBackSupported, prewarmWindowsPowerShellType } from "./focus"
+import { isTerminalFocused, focusTerminal, captureStartupWindowId, isKDEJumpBackSupported } from "./focus"
 import { shouldSuppressPermissionAlert, prunePermissionAlertState } from "./permission-dedupe"
 
 const IDLE_COMPLETE_DELAY_MS = 350
@@ -481,7 +481,6 @@ async function handleEventWithElapsedTime(
 }
 
 export const NotifierPlugin: Plugin = async ({ client, directory }) => {
-  prewarmWindowsPowerShellType()
   captureStartupWindowId()
 
   const clientEnv = process.env.OPENCODE_CLIENT

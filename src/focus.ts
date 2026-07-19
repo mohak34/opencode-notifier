@@ -161,20 +161,6 @@ interface WindowsWindowInfo {
   processName: string | null
 }
 
-export function prewarmWindowsPowerShellType(): void {
-  if (process.platform !== "win32") return
-  const warmupScript = `
-$p=Add-Type -Name NFI -Namespace OpenCodeNotifier -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();[DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetClassName(IntPtr h,System.Text.StringBuilder b,int n);[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);' -PassThru;
-Write-Output "ok"
-`.trim().replace(/\n/g, "; ")
-  try {
-    execFile("powershell", ["-NoProfile", "-NonInteractive", "-Command", warmupScript], {
-      timeout: 5000,
-      windowsHide: true,
-    })
-  } catch {}
-}
-
 function getWindowsActiveWindowInfo(): WindowsWindowInfo | null {
   const script = `
 $p=Add-Type -Name NFI -Namespace OpenCodeNotifier -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();[DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetClassName(IntPtr h,System.Text.StringBuilder b,int n);[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);' -PassThru;
