@@ -136,12 +136,76 @@ function getLinuxWaylandActiveWindowId(): string | null {
   return null
 }
 
-function getWindowsActiveWindowId(): string | null {
-  const script = `$type=Add-Type -Name FocusHelper -Namespace OpenCodeNotifier -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();' -PassThru; $type::GetForegroundWindow()`;
-  let windowId = execFileWithTimeout("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], 1000)
-  if (!windowId)
-    windowId = execFileWithTimeout("pwsh", ["-NoProfile", "-NonInteractive", "-Command", script], 1000)
-  return windowId
+const WINDOWS_TERMINAL_WINDOW_CLASSES = new Set<string>([
+  "cascadia_hosting_window_class",
+  "consolewindowclass",
+  "windowsterminalwindowclass",
+])
+
+const WINDOWS_TERMINAL_PROCESS_NAMES = new Set<string>([
+  "windowsterminal",
+  "windowsterminalpreview",
+  "conhost",
+  "alacritty",
+  "wezterm",
+  "wezterm-gui",
+  "kitty",
+  "hyper",
+  "cursor",
+  "code",
+  "code - insiders",
+])
+
+interface WindowsWindowInfo {
+  className: string | null
+  processName: string | null
+}
+
+export function prewarmWindowsPowerShellType(): void {
+  if (process.platform !== "win32") return
+  const warmupScript = `
+$p=Add-Type -Name NFI -Namespace OpenCodeNotifier -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();[DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetClassName(IntPtr h,System.Text.StringBuilder b,int n);[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);' -PassThru;
+Write-Output "ok"
+`.trim().replace(/\n/g, "; ")
+  try {
+    execFile("powershell", ["-NoProfile", "-NonInteractive", "-Command", warmupScript], {
+      timeout: 5000,
+      windowsHide: true,
+    })
+  } catch {}
+}
+
+function getWindowsActiveWindowInfo(): WindowsWindowInfo | null {
+  const script = `
+$p=Add-Type -Name NFI -Namespace OpenCodeNotifier -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();[DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetClassName(IntPtr h,System.Text.StringBuilder b,int n);[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);' -PassThru;
+$h=$p::GetForegroundWindow();
+if(!$h){return}
+$sb=New-Object System.Text.StringBuilder 256;
+$p::GetClassName($h,$sb,256)|Out-Null;
+$c=$sb.ToString();
+$procId=0;
+$p::GetWindowThreadProcessId($h,[ref]$procId)|Out-Null;
+$pn='';
+try{$pn=(Get-Process -Id $procId -ErrorAction SilentlyContinue).ProcessName}catch{}
+Write-Output "$c|$pn"
+`.trim().replace(/\n/g, "; ")
+  let output = execFileWithTimeout("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], 5000)
+  if (!output)
+    output = execFileWithTimeout("pwsh", ["-NoProfile", "-NonInteractive", "-Command", script], 1000)
+  if (!output) return null
+  const sep = output.indexOf("|")
+  if (sep === -1) return null
+  const className = output.substring(0, sep) || null
+  const processName = output.substring(sep + 1) || null
+  return { className, processName }
+}
+
+function isWindowsTerminalForeground(): boolean {
+  const info = getWindowsActiveWindowInfo()
+  if (!info) return false
+  const className = info.className?.toLowerCase() ?? ""
+  const processName = info.processName?.toLowerCase() ?? ""
+  return WINDOWS_TERMINAL_WINDOW_CLASSES.has(className) || WINDOWS_TERMINAL_PROCESS_NAMES.has(processName)
 }
 
 function getMacOSActiveWindowId(): string | null {
@@ -232,7 +296,7 @@ function getActiveWindowId(): string | null {
     if (process.env.DISPLAY) return execWithTimeout("xdotool getactivewindow")
     return null
   }
-  if (platform === "win32") return getWindowsActiveWindowId()
+  if (platform === "win32") return null
   return null
 }
 
@@ -279,11 +343,13 @@ export function isLinuxTerminalFocused(params: {
 }
 
 export function isWindowsTerminalFocused(params: {
-  cachedWindowId: string | null
-  currentWindowId: string | null
+  className: string | null
+  processName: string | null
 }): boolean {
-  const { cachedWindowId, currentWindowId } = params
-  return !!cachedWindowId && currentWindowId === cachedWindowId
+  const { className, processName } = params
+  const classLower = className?.toLowerCase() ?? ""
+  const processLower = processName?.toLowerCase() ?? ""
+  return WINDOWS_TERMINAL_WINDOW_CLASSES.has(classLower) || WINDOWS_TERMINAL_PROCESS_NAMES.has(processLower)
 }
 
 function isTmuxPaneActive(): boolean {
@@ -319,9 +385,10 @@ export function isTerminalFocused(): boolean {
     }
 
     if (process.platform === "win32") {
+      const info = getWindowsActiveWindowInfo()
       return isWindowsTerminalFocused({
-        cachedWindowId,
-        currentWindowId: getWindowsActiveWindowId(),
+        className: info?.className ?? null,
+        processName: info?.processName ?? null,
       })
     }
 
