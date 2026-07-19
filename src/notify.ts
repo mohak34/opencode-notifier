@@ -322,7 +322,7 @@ export async function sendNotification(
       message: message,
       timeout: timeout,
       icon: iconPath,
-      "app-name": windowsAppID ?? "opencode",
+      appName: windowsAppID ?? "opencode",
     }
 
     platformNotifier.notify(
