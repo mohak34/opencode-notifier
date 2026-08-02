@@ -589,6 +589,40 @@ WSL doesn't have a native notification daemon. Use PowerShell commands instead:
 }
 ```
 
+**Alternative: non-blocking toast via `NotifyIcon` (WSL)**
+
+The `Popup` recipe above opens a modal dialog that steals focus and must be
+dismissed (or times out). For a non-blocking toast that lands in the Windows
+notification area and auto-dismisses — on Windows 10/11 this routes through
+the native toast system / Action Center — use `NotifyIcon.ShowBalloonTip`:
+
+```json
+{
+  "notification": false,
+  "sound": true,
+  "command": {
+    "enabled": true,
+    "path": "powershell.exe",
+    "args": [
+      "-Command",
+      "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Application]::EnableVisualStyles(); $notify = New-Object System.Windows.Forms.NotifyIcon; $notify.Icon = [System.Drawing.SystemIcons]::Information; $notify.Visible = $true; $notify.ShowBalloonTip(5000, 'OpenCode - {event}', '{message}', [System.Windows.Forms.ToolTipIcon]::Info); Start-Sleep -Milliseconds 5500; $notify.Dispose()"
+    ]
+  }
+}
+```
+
+| Aspect               | `Wscript.Shell.Popup`       | `NotifyIcon.ShowBalloonTip`   |
+| -------------------- | --------------------------- | ----------------------------- |
+| Behavior             | Modal dialog window         | Toast in notification area    |
+| Focus                | Steals focus, blocks input  | Non-blocking                  |
+| Dismissal            | User closes or 5s timeout   | Auto-dismisses after 5s       |
+| Notification history | None                        | Action Center                 |
+| Trigger latency      | Fast                        | Slower (`Add-Type` cold start) |
+
+Note: `Add-Type -AssemblyName System.Windows.Forms` adds ~1–2s of cold-start
+latency on the first invocation. If trigger speed matters more than
+non-blocking UX, prefer the `Popup` recipe above.
+
 **Windows: OpenCode crashes when notifications appear?**
 This is a known Bun issue on Windows. Disable native notifications and use PowerShell popups:
 
