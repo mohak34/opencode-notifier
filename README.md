@@ -14,6 +14,16 @@ Add this to your `opencode.json`:
 
 Restart OpenCode. Done.
 
+## OpenCode version support
+
+This plugin supports both OpenCode 1 and OpenCode 2 from the same package:
+
+- **OpenCode 1** loads the legacy `server()` entrypoint.
+- **OpenCode 2** loads the `setup()` entrypoint introduced with the V2 plugin API.
+
+Install it the same way for both. On OpenCode 2, `opencode notifier` appears in `opencode plugin list` without any
+extra configuration.
+
 ## What it does
 
 You'll get notified when:
