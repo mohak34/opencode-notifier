@@ -34,11 +34,13 @@
     "alerts"
   ],
   "dependencies": {
+    "@opencode/plugin": "^2.0.8",
     "is-wsl": "^3.1.0",
     "node-notifier": "^10.0.1"
   },
   "devDependencies": {
     "@opencode-ai/plugin": "^1.18.25",
+    "@opencode/plugin": "^2.0.8",
     "@types/node": "^22.0.0",
     "@types/node-notifier": "^8.0.5",
     "typescript": "^5.0.0"

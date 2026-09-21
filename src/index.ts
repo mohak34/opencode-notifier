@@ -1,4 +1,7 @@
 import type { Plugin, PluginInput, PluginModule } from "@opencode-ai/plugin"
+import { Plugin as V2Plugin } from "@opencode/plugin"
+
+type V2Context = V2Plugin.Context
 import { basename } from "path"
 import { readFileSync, writeFileSync } from "fs"
 import {
@@ -236,7 +239,13 @@ async function handleEvent(
 
 function getSessionIDFromEvent(event: unknown): string | null {
   const properties = getNestedRecord(event, "properties")
-  return getStringField(properties, "sessionID")
+  const fromProperties = getStringField(properties, "sessionID")
+  if (fromProperties) {
+    return fromProperties
+  }
+  // OpenCode v2 events carry payload in `data` instead of `properties`.
+  const data = getNestedRecord(event, "data")
+  return getStringField(data, "sessionID")
 }
 
 export function getPermissionIDFromEvent(event: unknown): string | null {
@@ -246,7 +255,13 @@ export function getPermissionIDFromEvent(event: unknown): string | null {
     return id
   }
   const request = getNestedRecord(event, "properties", "request")
-  return getStringField(request, "id")
+  const requestId = getStringField(request, "id")
+  if (requestId) {
+    return requestId
+  }
+  // OpenCode v2: permission.asked data is { id, sessionID, ... }.
+  const data = getNestedRecord(event, "data")
+  return getStringField(data, "id")
 }
 
 // Grace period letting an auto-approved request resolve before we check the
@@ -284,10 +299,20 @@ interface SessionLifecycleInfo {
 
 function getSessionLifecycleInfo(event: unknown): SessionLifecycleInfo {
   const info = getNestedRecord(event, "properties", "info")
+  const v1Id = getStringField(info, "id")
+  if (v1Id || getStringField(info, "title") || getStringField(info, "parentID")) {
+    return {
+      id: v1Id,
+      title: getStringField(info, "title"),
+      parentID: getStringField(info, "parentID"),
+    }
+  }
+  // OpenCode v2: session.created data is { sessionID, title, parentID, ... }.
+  const data = getNestedRecord(event, "data")
   return {
-    id: getStringField(info, "id"),
-    title: getStringField(info, "title"),
-    parentID: getStringField(info, "parentID"),
+    id: getStringField(data, "sessionID") ?? getStringField(data, "id"),
+    title: getStringField(data, "title"),
+    parentID: getStringField(data, "parentID"),
   }
 }
 
@@ -658,4 +683,345 @@ const pluginModule: PluginModule = {
   server: NotifierPlugin,
 }
 
-export default pluginModule
+// --- OpenCode v2 support ---
+// V1 events use `event.properties.*`; v2 events use `event.data.*`.
+// These helpers normalize session access across both runtimes.
+
+async function getElapsedSinceLastPromptV2(
+  ctx: V2Context,
+  sessionID: string,
+  nowMs: number = Date.now()
+): Promise<number | null> {
+  try {
+    const output = await ctx.session.context({ sessionID })
+    const messages = Array.isArray(output) ? output : (output as unknown as { data?: unknown }).data
+    if (!Array.isArray(messages)) {
+      return null
+    }
+    let lastUserMessageTime: number | null = null
+    for (const msg of messages as Array<{ info?: { role?: string; time?: { created?: number } } }>) {
+      const info = (msg as { info?: unknown }).info as { role?: unknown; time?: { created?: unknown } } | undefined
+      if (info?.role === "user" && typeof info.time?.created === "number") {
+        if (lastUserMessageTime === null || info.time.created > lastUserMessageTime) {
+          lastUserMessageTime = info.time.created
+        }
+      }
+    }
+    if (lastUserMessageTime !== null) {
+      return (nowMs - lastUserMessageTime) / 1000
+    }
+  } catch {
+  }
+  return null
+}
+
+async function getSessionInfoV2(ctx: V2Context, sessionID: string): Promise<SessionInfo> {
+  try {
+    const output = await ctx.session.get({ sessionID })
+    const info = (output as unknown as { data?: unknown }).data ?? output
+    const record = asRecord(info)
+    const title = typeof record?.["title"] === "string" ? (record["title"] as string) : null
+    return {
+      isChild: !!record?.["parentID"],
+      title,
+    }
+  } catch {
+    return { isChild: false, title: null }
+  }
+}
+
+async function isPermissionStillPendingV2(
+  ctx: V2Context,
+  sessionID: string | null,
+  permissionID: string
+): Promise<boolean> {
+  try {
+    if (!sessionID) {
+      return true
+    }
+    const output = await ctx.permission.list({ sessionID })
+    const list = Array.isArray(output) ? output : (output as unknown as { data?: unknown }).data
+    if (!Array.isArray(list)) {
+      return true
+    }
+    return list.some((p: { id?: string }) => p?.id === permissionID)
+  } catch {
+    return true
+  }
+}
+
+async function handleEventWithElapsedTimeV2(
+  ctx: V2Context,
+  config: NotifierConfig,
+  eventType: EventType,
+  projectName: string | null,
+  event: unknown,
+  elapsedReferenceNowMs?: number,
+  preloadedSessionTitle?: string | null
+): Promise<void> {
+  const sessionID = getSessionIDFromEvent(event)
+  const commandMinDuration = config.command?.minDuration
+  const shouldLookupElapsedForCommand =
+    !!config.command?.enabled &&
+    typeof config.command?.path === "string" &&
+    config.command.path.length > 0 &&
+    typeof commandMinDuration === "number" &&
+    Number.isFinite(commandMinDuration) &&
+    commandMinDuration > 0
+  const shouldLookupElapsedForNotification =
+    typeof config.minDuration === "number" && Number.isFinite(config.minDuration) && config.minDuration > 0
+  const shouldLookupElapsed = shouldLookupElapsedForCommand || shouldLookupElapsedForNotification
+
+  let elapsedSeconds: number | null = null
+  if (shouldLookupElapsed && sessionID) {
+    elapsedSeconds = await getElapsedSinceLastPromptV2(ctx, sessionID, elapsedReferenceNowMs)
+  }
+
+  let sessionTitle: string | null = preloadedSessionTitle ?? null
+  const shouldLookupSessionInfo = sessionID && !sessionTitle && (config.showSessionTitle || shouldResolveAgentNameForEvent(config, eventType))
+  if (shouldLookupSessionInfo && sessionID) {
+    const info = await getSessionInfoV2(ctx, sessionID)
+    sessionTitle = info.title
+  }
+
+  const agentName = extractAgentNameFromSessionTitle(sessionTitle)
+  await handleEvent(config, eventType, projectName, elapsedSeconds, sessionTitle, sessionID, agentName)
+}
+
+async function processSessionIdleV2(
+  ctx: V2Context,
+  config: NotifierConfig,
+  projectName: string | null,
+  event: unknown,
+  sessionID: string,
+  sequence: number,
+  idleReceivedAtMs: number
+): Promise<void> {
+  if (!hasCurrentSessionIdleSequence(sessionID, sequence)) {
+    return
+  }
+  if (shouldSuppressSessionIdle(sessionID)) {
+    return
+  }
+  if (subagentSessionIds.has(sessionID)) {
+    await handleEventWithElapsedTimeV2(ctx, config, "subagent_complete", projectName, event, idleReceivedAtMs, null)
+    return
+  }
+  const sessionInfo = await getSessionInfoV2(ctx, sessionID)
+  if (!hasCurrentSessionIdleSequence(sessionID, sequence)) {
+    return
+  }
+  if (shouldSuppressSessionIdle(sessionID)) {
+    return
+  }
+  if (!sessionInfo.isChild) {
+    await handleEventWithElapsedTimeV2(ctx, config, "complete", projectName, event, idleReceivedAtMs, sessionInfo.title)
+    return
+  }
+  subagentSessionIds.add(sessionID)
+  await handleEventWithElapsedTimeV2(ctx, config, "subagent_complete", projectName, event, idleReceivedAtMs, sessionInfo.title)
+}
+
+function scheduleSessionIdleV2(
+  ctx: V2Context,
+  config: NotifierConfig,
+  projectName: string | null,
+  event: unknown,
+  sessionID: string
+): void {
+  clearPendingIdleTimer(sessionID)
+  const sequence = bumpSessionIdleSequence(sessionID)
+  const idleReceivedAtMs = Date.now()
+  const timer = setTimeout(() => {
+    pendingIdleTimers.delete(sessionID)
+    void processSessionIdleV2(ctx, config, projectName, event, sessionID, sequence, idleReceivedAtMs).catch(() => undefined)
+  }, IDLE_COMPLETE_DELAY_MS)
+  pendingIdleTimers.set(sessionID, timer)
+}
+
+function getV2StatusType(event: unknown): string | null {
+  const data = getNestedRecord(event, "data") ?? getNestedRecord(event, "properties")
+  const status = data?.["status"]
+  if (typeof status === "string") {
+    return status
+  }
+  const statusRecord = asRecord(status)
+  const type = statusRecord?.["type"]
+  return typeof type === "string" ? type : null
+}
+
+function getV2ErrorType(event: unknown): string | null {
+  const data = getNestedRecord(event, "data") ?? getNestedRecord(event, "properties")
+  const error = asRecord(data?.["error"])
+  if (!error) {
+    return null
+  }
+  for (const key of ["name", "type", "code"]) {
+    const value = error[key]
+    if (typeof value === "string" && value.length > 0) {
+      return value
+    }
+  }
+  return null
+}
+
+async function handleV2Event(ctx: V2Context, event: unknown, projectName: string | null): Promise<void> {
+  const record = asRecord(event)
+  const type = typeof record?.["type"] === "string" ? (record["type"] as string) : null
+  if (!type) {
+    return
+  }
+  const config = loadConfig()
+
+  if (type === "session.created") {
+    const info = getSessionLifecycleInfo(event)
+    if (info.parentID && info.id) {
+      subagentSessionIds.add(info.id)
+    } else {
+      await handleEvent(config, "session_started", projectName, null, info.title, info.id, null)
+    }
+    return
+  }
+
+  if (type === "session.deleted") {
+    const info = getSessionLifecycleInfo(event)
+    const sessionID = info.id ?? getSessionIDFromEvent(event)
+    if (sessionID) {
+      subagentSessionIds.delete(sessionID)
+    }
+    return
+  }
+
+  if (type === "permission.asked") {
+    const sessionID = getSessionIDFromEvent(event)
+    const permissionID = getPermissionIDFromEvent(event)
+    let stillPending = true
+    if (permissionID) {
+      await new Promise((resolve) => setTimeout(resolve, PERMISSION_PENDING_GRACE_MS))
+      stillPending = await isPermissionStillPendingV2(ctx, sessionID, permissionID)
+    }
+    if (stillPending && !shouldSuppressPermissionAlert(sessionID)) {
+      await handleEventWithElapsedTimeV2(ctx, config, "permission", projectName, event)
+    }
+    return
+  }
+
+  if (type === "session.idle") {
+    const sessionID = getSessionIDFromEvent(event)
+    if (sessionID) {
+      const clientEnv = process.env.OPENCODE_CLIENT
+      if (isCLIClient(clientEnv)) {
+        const idleReceivedAtMs = Date.now()
+        const sequence = bumpSessionIdleSequence(sessionID)
+        await processSessionIdleV2(ctx, config, projectName, event, sessionID, sequence, idleReceivedAtMs)
+      } else {
+        scheduleSessionIdleV2(ctx, config, projectName, event, sessionID)
+      }
+    } else {
+      await handleEventWithElapsedTimeV2(ctx, config, "complete", projectName, event)
+    }
+    return
+  }
+
+  if (type === "session.status") {
+    if (getV2StatusType(event) === "busy") {
+      const sessionID = getSessionIDFromEvent(event)
+      if (sessionID) {
+        markSessionBusy(sessionID)
+      }
+    }
+    return
+  }
+
+  if (type === "session.execution.failed" || type === "session.step.failed" || type === "session.error") {
+    // session.step.failed can accompany execution.failed; only handle once.
+    if (type === "session.step.failed") {
+      return
+    }
+    const sessionID = getSessionIDFromEvent(event)
+    markSessionError(sessionID)
+    const errorType = getV2ErrorType(event)
+    const eventType: EventType = errorType === "MessageAbortedError" ? "user_cancelled" : "error"
+    let sessionTitle: string | null = null
+    if (sessionID && config.showSessionTitle) {
+      const info = await getSessionInfoV2(ctx, sessionID)
+      sessionTitle = info.title
+    }
+    await handleEventWithElapsedTimeV2(ctx, config, eventType, projectName, event, undefined, sessionTitle)
+    return
+  }
+
+  if (type === "session.execution.interrupted") {
+    const sessionID = getSessionIDFromEvent(event)
+    markSessionError(sessionID)
+    const data = getNestedRecord(event, "data")
+    const reason = getStringField(data, "reason")
+    const eventType: EventType = reason === "user" ? "user_cancelled" : "error"
+    await handleEventWithElapsedTimeV2(ctx, config, eventType, projectName, event)
+    return
+  }
+
+  if (type === "session.inbox.delivered" || type === "session.inbox.enqueued") {
+    const sessionID = getSessionIDFromEvent(event)
+    if (!sessionID || !subagentSessionIds.has(sessionID)) {
+      await handleEvent(config, "user_message", projectName, null, null, sessionID, null)
+    }
+    return
+  }
+}
+
+const v2Definition = V2Plugin.define({
+  id: "opencode-notifier",
+  async setup(ctx) {
+    captureStartupWindowId()
+
+    const clientEnv = process.env.OPENCODE_CLIENT
+    if (clientEnv && clientEnv !== "cli") {
+      const config = loadConfig()
+      if (!config.enableOnDesktop) {
+        return
+      }
+    }
+
+    const directory = ctx.location.directory
+    const projectName = directory ? (loadConfig().showFullPath ? directory : basename(directory)) : null
+
+    const isCLI = isCLIClient(clientEnv)
+    if (isCLI) {
+      void handleEvent(loadConfig(), "client_connected", projectName, null)
+    } else {
+      setTimeout(() => {
+        void handleEvent(loadConfig(), "client_connected", projectName, null)
+      }, 100)
+    }
+
+    const controller = new AbortController()
+    void (async () => {
+      for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
+        try {
+          await handleV2Event(ctx, event, projectName)
+        } catch {
+          // Never break the event loop on notifier errors.
+        }
+      }
+    })()
+
+    await ctx.tool.hook("execute.before", async (hookEvent) => {
+      const config = loadConfig()
+      const toolName = (hookEvent as { tool?: unknown }).tool
+      if (toolName === "question") {
+        await handleEvent(config, "question", projectName, null)
+      }
+      if (toolName === "plan_exit") {
+        await handleEvent(config, "plan_exit", projectName, null)
+      }
+    })
+
+    return () => controller.abort()
+  },
+})
+
+export default {
+  ...v2Definition,
+  server: NotifierPlugin,
+}
