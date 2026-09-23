@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test"
 import {
   buildOsascriptNotificationArgs,
+  buildWindowsNotificationOptions,
   formatGhosttyNotificationSequence,
   parseNotifySendOutputLine,
 } from "./notify"
@@ -57,5 +58,25 @@ describe("buildOsascriptNotificationArgs", () => {
     expect(args[1]).not.toContain(message)
     expect(args[2]).toBe(message)
     expect(args[3]).toBe(title)
+  })
+})
+
+describe("buildWindowsNotificationOptions", () => {
+  test("uses the appName key WindowsToaster maps to SnoreToast -appID", () => {
+    const options = buildWindowsNotificationOptions("OpenCode", "done", 5, undefined, undefined)
+
+    expect(options.appName).toBe("opencode")
+    // The Linux "app-name" key is silently dropped on Windows and yields
+    // generic "SnoreToast" toasts (#114).
+    expect(options).not.toHaveProperty("app-name")
+  })
+
+  test("honors the configured windows.appID", () => {
+    const options = buildWindowsNotificationOptions("OpenCode", "done", 5, "/icon.png", "my-app")
+
+    expect(options.appName).toBe("my-app")
+    expect(options.title).toBe("OpenCode")
+    expect(options.message).toBe("done")
+    expect(options.icon).toBe("/icon.png")
   })
 })

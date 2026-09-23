@@ -228,6 +228,33 @@ export function parseNotifySendOutputLine(
   return null
 }
 
+export interface WindowsNotificationOptions {
+  title: string
+  message: string
+  timeout: number
+  icon: string | undefined
+  appName: string
+}
+
+export function buildWindowsNotificationOptions(
+  title: string,
+  message: string,
+  timeout: number,
+  iconPath?: string,
+  windowsAppID?: string
+): WindowsNotificationOptions {
+  return {
+    title: title,
+    message: message,
+    timeout: timeout,
+    icon: iconPath,
+    // node-notifier's WindowsToaster only maps `appName` (not the Linux
+    // "app-name" key) to SnoreToast's -appID. Without it, toasts fall back
+    // to the generic "SnoreToast" label (#114).
+    appName: windowsAppID ?? "opencode",
+  }
+}
+
 export function buildOsascriptNotificationArgs(title: string, message: string): string[] {
   return [
     "-e",
@@ -317,13 +344,7 @@ export async function sendNotification(
   }
 
   return new Promise((resolve) => {
-    const notificationOptions: any = {
-      title: title,
-      message: message,
-      timeout: timeout,
-      icon: iconPath,
-      appName: windowsAppID ?? "opencode",
-    }
+    const notificationOptions: any = buildWindowsNotificationOptions(title, message, timeout, iconPath, windowsAppID)
 
     platformNotifier.notify(
       notificationOptions,
