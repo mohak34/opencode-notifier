@@ -545,109 +545,123 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
 
   return {
     event: async ({ event }) => {
-      const config = getConfig()
+      // A notifier must never take down the host: an unexpected event shape
+      // fails silently instead of crashing OpenCode (#25).
+      try {
+        const config = getConfig()
 
-      // Track subagent sessions from session lifecycle events
-      if (event.type === "session.created") {
-        const info = getSessionLifecycleInfo(event)
-        if (info.parentID && info.id) {
-          subagentSessionIds.add(info.id)
-        } else {
-          // Non-subagent session started
-          await handleEvent(config, "session_started", projectName, null, info.title, info.id, null)
-        }
-      }
-
-      if (event.type === "session.updated") {
-        const info = getSessionLifecycleInfo(event)
-        if (info.parentID && info.id) {
-          subagentSessionIds.add(info.id)
-        }
-      }
-
-      if (event.type === "session.deleted") {
-        const info = getSessionLifecycleInfo(event)
-        if (info.id) {
-          subagentSessionIds.delete(info.id)
-        }
-      }
-
-      if ((event as any).type === "permission.asked") {
-        const sessionID = getSessionIDFromEvent(event)
-        const permissionID = getPermissionIDFromEvent(event)
-        let stillPending = true
-        if (permissionID) {
-          // Auto-approved requests are resolved immediately, so wait briefly
-          // and only notify when the request is still pending.
-          await new Promise((resolve) => setTimeout(resolve, PERMISSION_PENDING_GRACE_MS))
-          stillPending = await isPermissionStillPending(client, permissionID)
-        }
-        // Claim the shared dedupe window only when a notification is actually
-        // about to fire: a silently skipped auto-approved request must not mute a
-        // real one arriving within the same second.
-        if (stillPending && !shouldSuppressPermissionAlert(sessionID)) {
-          await handleEventWithElapsedTime(client, config, "permission", projectName, event)
-        }
-      }
-
-      if (event.type === "session.idle") {
-        const sessionID = getSessionIDFromEvent(event)
-        if (sessionID) {
-          if (isCLI) {
-            // CLI sessions (opencode run) exit soon after going idle.
-            // Process completion directly to avoid losing the notification
-            // when the process terminates before the debounce timer fires.
-            const idleReceivedAtMs = Date.now()
-            const sequence = bumpSessionIdleSequence(sessionID)
-            await processSessionIdle(client, config, projectName, event, sessionID, sequence, idleReceivedAtMs)
+        // Track subagent sessions from session lifecycle events
+        if (event.type === "session.created") {
+          const info = getSessionLifecycleInfo(event)
+          if (info.parentID && info.id) {
+            subagentSessionIds.add(info.id)
           } else {
-            scheduleSessionIdle(client, config, projectName, event, sessionID)
-          }
-        } else {
-          await handleEventWithElapsedTime(client, config, "complete", projectName, event)
-        }
-      }
-
-      if (event.type === "session.status" && event.properties.status.type === "busy") {
-        markSessionBusy(event.properties.sessionID)
-      }
-
-      if (event.type === "session.error") {
-        const sessionID = getSessionIDFromEvent(event)
-        markSessionError(sessionID)
-        const eventType: EventType = event.properties.error?.name === "MessageAbortedError" ? "user_cancelled" : "error"
-        let sessionTitle: string | null = null
-        if (sessionID && config.showSessionTitle) {
-          const info = await getSessionInfo(client, sessionID)
-          sessionTitle = info.title
-        }
-        await handleEventWithElapsedTime(client, config, eventType, projectName, event, undefined, sessionTitle)
-      }
-
-      if (event.type === "message.updated") {
-        const info = getMessageUpdatedInfo(event)
-        if (info.role === "user") {
-          const sessionID = info.sessionID
-          // Only fire for non-subagent sessions
-          if (!sessionID || !subagentSessionIds.has(sessionID)) {
-            await handleEvent(config, "user_message", projectName, null, null, sessionID, null)
+            // Non-subagent session started
+            await handleEvent(config, "session_started", projectName, null, info.title, info.id, null)
           }
         }
+
+        if (event.type === "session.updated") {
+          const info = getSessionLifecycleInfo(event)
+          if (info.parentID && info.id) {
+            subagentSessionIds.add(info.id)
+          }
+        }
+
+        if (event.type === "session.deleted") {
+          const info = getSessionLifecycleInfo(event)
+          if (info.id) {
+            subagentSessionIds.delete(info.id)
+          }
+        }
+
+        if ((event as any).type === "permission.asked") {
+          const sessionID = getSessionIDFromEvent(event)
+          const permissionID = getPermissionIDFromEvent(event)
+          let stillPending = true
+          if (permissionID) {
+            // Auto-approved requests are resolved immediately, so wait briefly
+            // and only notify when the request is still pending.
+            await new Promise((resolve) => setTimeout(resolve, PERMISSION_PENDING_GRACE_MS))
+            stillPending = await isPermissionStillPending(client, permissionID)
+          }
+          // Claim the shared dedupe window only when a notification is actually
+          // about to fire: a silently skipped auto-approved request must not mute a
+          // real one arriving within the same second.
+          if (stillPending && !shouldSuppressPermissionAlert(sessionID)) {
+            await handleEventWithElapsedTime(client, config, "permission", projectName, event)
+          }
+        }
+
+        if (event.type === "session.idle") {
+          const sessionID = getSessionIDFromEvent(event)
+          if (sessionID) {
+            if (isCLI) {
+              // CLI sessions (opencode run) exit soon after going idle.
+              // Process completion directly to avoid losing the notification
+              // when the process terminates before the debounce timer fires.
+              const idleReceivedAtMs = Date.now()
+              const sequence = bumpSessionIdleSequence(sessionID)
+              await processSessionIdle(client, config, projectName, event, sessionID, sequence, idleReceivedAtMs)
+            } else {
+              scheduleSessionIdle(client, config, projectName, event, sessionID)
+            }
+          } else {
+            await handleEventWithElapsedTime(client, config, "complete", projectName, event)
+          }
+        }
+
+        if (event.type === "session.status" && event.properties.status.type === "busy") {
+          markSessionBusy(event.properties.sessionID)
+        }
+
+        if (event.type === "session.error") {
+          const sessionID = getSessionIDFromEvent(event)
+          markSessionError(sessionID)
+          const eventType: EventType = event.properties.error?.name === "MessageAbortedError" ? "user_cancelled" : "error"
+          let sessionTitle: string | null = null
+          if (sessionID && config.showSessionTitle) {
+            const info = await getSessionInfo(client, sessionID)
+            sessionTitle = info.title
+          }
+          await handleEventWithElapsedTime(client, config, eventType, projectName, event, undefined, sessionTitle)
+        }
+
+        if (event.type === "message.updated") {
+          const info = getMessageUpdatedInfo(event)
+          if (info.role === "user") {
+            const sessionID = info.sessionID
+            // Only fire for non-subagent sessions
+            if (!sessionID || !subagentSessionIds.has(sessionID)) {
+              await handleEvent(config, "user_message", projectName, null, null, sessionID, null)
+            }
+          }
+        }
+      } catch {
+        // Fail silently: notification side effects must not break the session.
       }
     },
     "permission.ask": async () => {
-      const config = getConfig()
-      if (!shouldSuppressPermissionAlert(null)) {
-        await handleEvent(config, "permission", projectName, null)
+      try {
+        const config = getConfig()
+        if (!shouldSuppressPermissionAlert(null)) {
+          await handleEvent(config, "permission", projectName, null)
+        }
+      } catch {
+        // Fail silently: notification side effects must not break the session.
       }
     },
     "tool.execute.before": async (input) => {
-      const config = getConfig()
-      if (input.tool === "question") {
-        await handleEvent(config, "question", projectName, null)
-      }
-      if (input.tool === "plan_exit") {
-        await handleEvent(config, "plan_exit", projectName, null)
+      try {
+        const config = getConfig()
+        if (input.tool === "question") {
+          await handleEvent(config, "question", projectName, null)
+        }
+        if (input.tool === "plan_exit") {
+          await handleEvent(config, "plan_exit", projectName, null)
+        }
+      } catch {
+        // Fail silently: notification side effects must not break the session.
       }
     },
   }

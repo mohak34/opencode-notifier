@@ -19,14 +19,22 @@ export function runCommand(config: NotifierConfig, event: EventType, message: st
   const args = (config.command.args ?? []).map((arg) => substituteTokens(arg, event, message, sessionTitle, agentName, projectName, timestamp, turn))
   const command = substituteTokens(config.command.path, event, message, sessionTitle, agentName, projectName, timestamp, turn)
 
-  const proc = spawn(command, args, {
-    // Keep token values as argv data. Interpreter commands must pass them to
-    // their script as separate arguments instead of embedding them in source.
-    shell: false,
-    stdio: "ignore",
-    detached: true,
-    windowsHide: true,
-  })
+  // Fire-and-forget: a notifier must never take down the host, so a
+  // synchronous spawn throw (bad path, EACCES, ...) is swallowed here.
+  // Async failures are already ignored via the error handler below.
+  let proc: ReturnType<typeof spawn>
+  try {
+    proc = spawn(command, args, {
+      // Keep token values as argv data. Interpreter commands must pass them to
+      // their script as separate arguments instead of embedding them in source.
+      shell: false,
+      stdio: "ignore",
+      detached: true,
+      windowsHide: true,
+    })
+  } catch {
+    return
+  }
 
   proc.on("error", () => {})
   proc.unref()
