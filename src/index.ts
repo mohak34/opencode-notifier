@@ -102,6 +102,15 @@ const cleanupInterval = setInterval(() => {
     }
   }
 
+  // Prune subagent tombstones (e.g. deleted sessions) with no pending work.
+  // A live child pruned here is still classified correctly later via API
+  // lookup; only a deleted session skips notification, which is the point.
+  for (const sessionID of subagentSessionIds) {
+    if (!pendingIdleTimers.has(sessionID) && !sessionIdleSequence.has(sessionID)) {
+      subagentSessionIds.delete(sessionID)
+    }
+  }
+
   // Clean up sessionErrorSuppressionAt
   for (const [sessionID, timestamp] of sessionErrorSuppressionAt) {
     if (timestamp < cutoff) {
@@ -389,7 +398,8 @@ async function getElapsedSinceLastPrompt(
 }
 
 interface SessionInfo {
-  isChild: boolean
+  // null means the lookup failed (e.g. session was deleted): unknown, not top-level
+  isChild: boolean | null
   title: string | null
 }
 
@@ -405,7 +415,7 @@ async function getSessionInfo(
       title,
     }
   } catch {
-    return { isChild: false, title: null }
+    return { isChild: null, title: null }
   }
 }
 
@@ -440,6 +450,12 @@ async function processSessionIdle(
   }
 
   if (shouldSuppressSessionIdle(sessionID)) {
+    return
+  }
+
+  // Lookup failed (e.g. session deleted before the debounced idle ran):
+  // never treat an unknown session as top-level.
+  if (sessionInfo.isChild === null) {
     return
   }
 
@@ -565,12 +581,10 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
         }
       }
 
-      if (event.type === "session.deleted") {
-        const info = getSessionLifecycleInfo(event)
-        if (info.id) {
-          subagentSessionIds.delete(info.id)
-        }
-      }
+      // NOTE: session.deleted intentionally leaves subagentSessionIds alone.
+      // A debounced idle arriving after the delete must still classify as
+      // subagent, not top-level complete. Stale ids are pruned by the
+      // periodic cleanup below.
 
       if ((event as any).type === "permission.asked") {
         const sessionID = getSessionIDFromEvent(event)
