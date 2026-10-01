@@ -16,7 +16,7 @@ import { sendNotification } from "./notify"
 import { playSound } from "./sound"
 import { ringBell } from "./bell"
 import { runCommand } from "./command"
-import { isTerminalFocused, focusTerminal, isTerminalJumpBackSupported } from "./focus"
+import { isTerminalFocused, focusTerminal, isTerminalJumpBackSupported, debugFocusState } from "./focus"
 
 let globalTurnCount: number | null = null
 
@@ -134,10 +134,14 @@ export async function handleEvent(
     const onNotificationClick = focusOnClick || (clickCommand.enabled && clickCommand.path) ? () => {
       if (clicked) return
       clicked = true
+      debugFocusState(`notification activated (event=${eventType}), focusOnClick=${focusOnClick}`)
       if (clickCommand.enabled) {
         runCommand({ ...config, command: clickCommand }, eventType, message, sessionTitle, agentName, projectName, timestamp, turn, sessionID)
       }
-      if (focusOnClick) void focusTerminal().catch(() => {})
+      if (focusOnClick) void focusTerminal().then(
+        () => debugFocusState("focusTerminal() finished"),
+        (error) => debugFocusState(`focusTerminal() threw: ${String(error)}`)
+      )
     } : undefined
     promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping,
       onNotificationClick, config.windows.appID, focusOnClick ? "Jump to terminal" : "Run command"))

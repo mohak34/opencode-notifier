@@ -563,6 +563,8 @@ Restart OpenCode while the terminal window you want to return to is focused. Lea
 
 The extension targets GNOME Shell 45 through 50. The button appears when the plugin successfully captured a startup window through the extension. Automated checks cover the extension logic and communication, but window switching still needs validation on a real GNOME desktop.
 
+On Notification Spec 1.2 servers (e.g. GNOME Shell 50), `notify-send` 0.8+ refuses `--action` mode (`Actions are not supported by this notifications server`) and exits without waiting for the click. When that happens — or when `notify-send` is missing — the plugin sends the same action payload directly over D-Bus and listens for the click with `dbus-monitor` (both must be on `PATH`; `gdbus` is already required for GNOME features). Set `OPENCODE_NOTIFIER_DEBUG=1` to log when the fallback triggers.
+
 Notification delivery returns once `notify-send` prints the notification ID. The click listener lasts for the configured notification `timeout` plus a one-second grace period, then closes even if the notification daemon ignores expiry.
 
 ## Updating
