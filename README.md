@@ -494,7 +494,7 @@ The plugin tracks native OpenCode child sessions and their descendants from crea
 | ---------------------------------------- | ---------------------------------------- | --------------------- | ------------------------------ |
 | macOS                                    | AppleScript (`System Events`)          | None                  | Untested                       |
 | Linux X11                                | `xdotool`                              | `xdotool` installed | Untested                       |
-| Linux Wayland (Hyprland)                 | `hyprctl activewindow`                 | None                  | Tested                         |
+| Linux Wayland (Hyprland)                 | `hyprctl activewindow`; legacy or Lua (0.55+) `dispatch` for click-to-focus | None | Tested (0.56.2, Lua config) |
 | Linux Wayland (Niri)                     | `niri msg --json focused-window`       | None                  | Tested                         |
 | Linux Wayland (Sway)                     | `swaymsg -t get_tree`                  | None                  | Untested                       |
 | Linux Wayland (KDE)                      | `kdotool`                              | `kdotool` installed | Tested                         |

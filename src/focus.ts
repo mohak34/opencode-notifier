@@ -1106,9 +1106,14 @@ findAndActivateTerminal();
 function focusLinuxWindowHyprland(windowId: string): void {
   if (!isSafeCompositorWindowId(windowId)) return
 
+  // Lua configs (Hyprland 0.55+) reject the legacy dispatch with a non-zero exit, so retry with the hl.dsp form.
   try {
     execFileSync("hyprctl", ["dispatch", "focuswindow", `address:${windowId}`], { timeout: 1000, stdio: "ignore" })
   } catch {
+    try {
+      execFileSync("hyprctl", ["dispatch", `hl.dsp.focus({ window = "address:${windowId}" })`], { timeout: 1000, stdio: "ignore" })
+    } catch {
+    }
   }
 }
 
