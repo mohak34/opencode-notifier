@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from "bun:test"
-import { claimSoundSlot, playSound, resetSoundState } from "./sound"
+import { buildWindowsSoundScript, claimSoundSlot, playSound, resetSoundState } from "./sound"
 
 describe("claimSoundSlot", () => {
   beforeEach(() => {
@@ -30,5 +30,21 @@ describe("claimSoundSlot", () => {
     // plan_exit has no bundled wav; with no custom path nothing can play.
     await playSound("plan_exit", null, 1)
     expect(claimSoundSlot("complete")).toBe(true)
+  })
+})
+
+describe("buildWindowsSoundScript", () => {
+  test("full volume plays without touching the mixer", () => {
+    expect(buildWindowsSoundScript("C:/a'b.wav", 1)).toBe("(New-Object Media.SoundPlayer 'C:/a''b.wav').PlaySync()")
+  })
+
+  test("partial volume sets both channels before playing", () => {
+    const script = buildWindowsSoundScript("C:/a.wav", 0.5)
+    expect(script).toContain(`waveOutSetVolume([IntPtr]::Zero, ${0x80008000})`)
+    expect(script.indexOf("waveOutSetVolume([IntPtr]")).toBeLessThan(script.indexOf("PlaySync"))
+  })
+
+  test("zero volume mutes", () => {
+    expect(buildWindowsSoundScript("C:/a.wav", 0)).toContain("waveOutSetVolume([IntPtr]::Zero, 0)")
   })
 })

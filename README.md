@@ -331,7 +331,7 @@ Set per-event volume from `0` to `1`:
 
 - On players that support volume control, `0` = mute and `1` = full volume
 - Values outside `0..1` are clamped automatically
-- Windows playback and Linux `aplay` ignore volume settings. For reliable muting, set `sound` to `false` and remove any per-event `sound: true` overrides, or disable sound for each event
+- Linux `aplay` ignores volume settings. Windows sets the volume of the PowerShell process that plays the sound. For reliable muting, set `sound` to `false` and remove any per-event `sound: true` overrides, or disable sound for each event
 
 ### Custom commands
 
@@ -500,9 +500,11 @@ The plugin tracks native OpenCode child sessions and their descendants from crea
 | Linux Wayland (KDE)                      | `kdotool`                              | `kdotool` installed | Tested                         |
 | Linux Wayland (GNOME)                    | Optional Shell bridge, then AT-SPI (`gdbus`) | `gdbus` installed   | AT-SPI tested (Ubuntu 26.04.1 LTS + GNOME Shell 50.1 + Ghostty 1.3.0); Shell bridge needs desktop validation |
 | Linux Wayland (river, dwl, Cosmic, etc.) | No window backend; pane fallback when available | -                 | Notifies when focus cannot be determined |
-| Windows                                  | `GetForegroundWindow()` via PowerShell | None                  | Untested                       |
+| Windows                                  | Foreground window vs. OpenCode's console owner, via PowerShell | None | Untested |
 
 **GNOME Wayland**: Focus detection first tries the optional Shell extension described under [Jump back to terminal](#linux-jump-back-to-terminal-from-notification), then falls back to the accessibility bus. Without the extension, restricted Shell APIs and XWayland tools such as `xdotool` cannot provide the native Wayland window identity used here. The AT-SPI fallback selects the terminal window with its `ACTIVE` state bit set. Ghostty is matched by its `/com/mitchellh/ghostty` AT-SPI path, other terminals by app name, including the `gnome-terminal-server` alias. AT-SPI window identity is `bus@path` since paths repeat across processes. This fallback was verified on Ubuntu 26.04.1 LTS + GNOME Shell 50.1 + Ghostty 1.3.0; the new Shell bridge still needs live desktop validation. With several terminal windows open, suppression compares against the window that was active at startup. Set `OPENCODE_NOTIFIER_DEBUG=1` to log the focus backend decision.
+
+**Windows**: Suppression applies only when the window hosting OpenCode's console is in front. Windows Terminal and the classic console are matched by window handle, so another terminal window, VS Code, or any other app does not suppress alerts. Hosts that do not own their console window, such as VS Code, WezTerm, and Alacritty, are matched when the foreground window belongs to a parent process of OpenCode. Tabs are not distinguished: with OpenCode in a background Windows Terminal tab, the window still counts as focused. Set `OPENCODE_NOTIFIER_DEBUG=1` to log each decision.
 
 **Unsupported compositors**: Wayland has no standard protocol for querying the focused window. Each compositor has its own IPC. Without a window backend, supported pane checks provide a best-effort fallback. If neither can determine focus, notifications are allowed.
 
