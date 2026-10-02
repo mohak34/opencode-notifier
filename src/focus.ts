@@ -374,61 +374,55 @@ export function debugFocusState(message: string): void {
   }
 }
 
-const WINDOWS_TERMINAL_WINDOW_CLASSES = new Set<string>([
-  "cascadia_hosting_window_class",
-  "consolewindowclass",
-  "windowsterminalwindowclass",
-])
-
-const WINDOWS_TERMINAL_PROCESS_NAMES = new Set<string>([
-  "windowsterminal",
-  "windowsterminalpreview",
-  "conhost",
-  "alacritty",
-  "wezterm",
-  "wezterm-gui",
-  "kitty",
-  "hyper",
-  "cursor",
-  "code",
-  "code - insiders",
-])
-
-interface WindowsWindowInfo {
-  className: string | null
-  processName: string | null
+// Windows focus is decided against the console OpenCode is attached to, not
+// against a list of terminal class names. Windows Terminal and conhost own
+// that console's window, so a handle compare tells our window from any other
+// terminal or editor. Hosts that leave the ConPTY window unowned (VS Code,
+// WezTerm, Alacritty) fall back to "the foreground window's process is one of
+// our ancestors". Prints "focused", "other", "none" or "noconsole"; any error
+// stops the script before a verdict, which fails open.
+export function buildWindowsFocusScript(pid: number): string {
+  return `
+$ErrorActionPreference='Stop'
+$k=Add-Type -Name Focus -Namespace OpenCodeNotifier -PassThru -MemberDefinition '
+[DllImport("kernel32.dll")] public static extern bool FreeConsole();
+[DllImport("kernel32.dll")] public static extern bool AttachConsole(uint p);
+[DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
+[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+[DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr h, uint f);
+[DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint p);'
+$fg=$k::GetForegroundWindow()
+if($fg -eq [IntPtr]::Zero){'none';return}
+[void]$k::FreeConsole()
+if(-not $k::AttachConsole(${pid})){'noconsole';return}
+$c=$k::GetConsoleWindow()
+$root=$k::GetAncestor($c,3)
+if($root -ne [IntPtr]::Zero -and $fg -eq $root){'focused';return}
+if($root -ne $c -or ($c -ne [IntPtr]::Zero -and $k::IsWindowVisible($c))){'other';return}
+$fp=[uint32]0
+[void]$k::GetWindowThreadProcessId($fg,[ref]$fp)
+$parents=@{}
+Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId|%{$parents[[int]$_.ProcessId]=[int]$_.ParentProcessId}
+$p=${pid};$seen=@{}
+while($p -and -not $seen[$p]){if($p -eq $fp){'focused';return};$seen[$p]=1;$p=$parents[$p]}
+'other'
+`.trim()
 }
 
-function getWindowsActiveWindowInfo(): WindowsWindowInfo | null {
-  const script = `
-$p=Add-Type -Name NFI -Namespace OpenCodeNotifier -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();[DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetClassName(IntPtr h,System.Text.StringBuilder b,int n);[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);' -PassThru;
-$h=$p::GetForegroundWindow();
-if(!$h){return}
-$sb=New-Object System.Text.StringBuilder 256;
-$p::GetClassName($h,$sb,256)|Out-Null;
-$c=$sb.ToString();
-$procId=0;
-$p::GetWindowThreadProcessId($h,[ref]$procId)|Out-Null;
-$pn='';
-try{$pn=(Get-Process -Id $procId -ErrorAction SilentlyContinue).ProcessName}catch{}
-Write-Output "$c|$pn"
-`.trim().replace(/\n/g, "; ")
-  let output = execFileWithTimeout("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], 5000)
-  if (!output)
-    output = execFileWithTimeout("pwsh", ["-NoProfile", "-NonInteractive", "-Command", script], 1000)
-  if (!output) return null
-  // PowerShell may prepend a CLIXML marker/warning line to stdout; drop it so
-  // the "class|process" parse stays correct.
-  const line = output
-    .split("\n")
-    .map((l) => l.trim())
-    .find((l) => l.length > 0 && !l.startsWith("#<"))
-  if (!line) return null
-  const sep = line.indexOf("|")
-  if (sep === -1) return null
-  const className = line.substring(0, sep) || null
-  const processName = line.substring(sep + 1) || null
-  return { className, processName }
+// PowerShell may print CLIXML or warnings around the verdict; only an exact
+// "focused" line counts. Anything else fails open so the alert is delivered.
+export function parseWindowsFocusOutput(output: string | null): boolean {
+  return !!output?.split(/\r?\n/).some(line => line.trim() === "focused")
+}
+
+function isWindowsConsoleFocused(): boolean {
+  const encoded = Buffer.from(buildWindowsFocusScript(process.pid), "utf16le").toString("base64")
+  const args = ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded]
+  const output = execFileWithTimeout("powershell", args, 5000) ?? execFileWithTimeout("pwsh", args, 5000)
+  const focused = parseWindowsFocusOutput(output)
+  debugFocusState(`windows focus: pid=${process.pid} result=${output ?? "null"} focused=${focused}`)
+  return focused
 }
 
 function getMacOSActiveWindowId(): string | null {
@@ -591,16 +585,6 @@ export function isLinuxTerminalFocused(params: {
   return true
 }
 
-export function isWindowsTerminalFocused(params: {
-  className: string | null
-  processName: string | null
-}): boolean {
-  const { className, processName } = params
-  const classLower = className?.toLowerCase() ?? ""
-  const processLower = processName?.toLowerCase() ?? ""
-  return WINDOWS_TERMINAL_WINDOW_CLASSES.has(classLower) || WINDOWS_TERMINAL_PROCESS_NAMES.has(processLower)
-}
-
 function isTmuxPaneActive(): boolean {
   const tmuxPane = process.env.TMUX_PANE ?? null
   const result = execFileWithTimeout("tmux", ["display-message", "-t", tmuxPane ?? "", "-p", "#{session_attached} #{window_active} #{pane_active}"])
@@ -635,13 +619,7 @@ export function isTerminalFocused(): boolean {
       return true
     }
 
-    if (process.platform === "win32") {
-      const info = getWindowsActiveWindowInfo()
-      return isWindowsTerminalFocused({
-        className: info?.className ?? null,
-        processName: info?.processName ?? null,
-      })
-    }
+    if (process.platform === "win32") return isWindowsConsoleFocused()
 
     const tmuxPaneActive = process.env.TMUX ? isTmuxPaneActive() : null
     const currentWindowId = getActiveWindowId()

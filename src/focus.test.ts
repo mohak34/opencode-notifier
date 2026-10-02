@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test"
 import { isZellijPaneFocused } from "./focus"
-import { isLinuxTerminalFocused, isMacTerminalAppFocused, isTmuxPaneFocused, parseWezTermFocusedPaneId, isKDEJumpBackSupported, captureStartupWindowId, focusTerminal, getCachedWindowTitle, isWindowsTerminalFocused, buildOsascriptActivateAppArgs, findQdbusBinary, resolveQdbusBinary, isGnomeLikeSession, getLinuxFocusBackendName, parseAtspiString, parseAtspiObjectRefs, parseAtspiStateActive, isAtspiTerminalWindow, isAtspiWindowRoleAccepted } from "./focus"
+import { isLinuxTerminalFocused, isMacTerminalAppFocused, isTmuxPaneFocused, parseWezTermFocusedPaneId, isKDEJumpBackSupported, captureStartupWindowId, focusTerminal, getCachedWindowTitle, buildWindowsFocusScript, parseWindowsFocusOutput, buildOsascriptActivateAppArgs, findQdbusBinary, resolveQdbusBinary, isGnomeLikeSession, getLinuxFocusBackendName, parseAtspiString, parseAtspiObjectRefs, parseAtspiStateActive, isAtspiTerminalWindow, isAtspiWindowRoleAccepted } from "./focus"
 
 describe("isMacTerminalAppFocused", () => {
   test("matches Terminal when TERM_PROGRAM is Apple_Terminal", () => {
@@ -150,105 +150,38 @@ describe("Zellij pane focus", () => {
   })
 })
 
-describe("isWindowsTerminalFocused", () => {
-  test("matches Windows Terminal by class name", () => {
-    expect(isWindowsTerminalFocused({ className: "CASCADIA_HOSTING_WINDOW_CLASS", processName: null })).toBe(true)
-  })
-
-  test("matches Windows Terminal by process name", () => {
-    expect(isWindowsTerminalFocused({ className: null, processName: "WindowsTerminal" })).toBe(true)
-  })
-
-  test("matches conhost by class name", () => {
-    expect(isWindowsTerminalFocused({ className: "ConsoleWindowClass", processName: null })).toBe(true)
-  })
-
-  test("matches conhost by process name", () => {
-    expect(isWindowsTerminalFocused({ className: null, processName: "conhost" })).toBe(true)
-  })
-
-  test("matches Alacritty by process name", () => {
-    expect(isWindowsTerminalFocused({ className: null, processName: "alacritty" })).toBe(true)
-  })
-
-  test("matches WezTerm by process name", () => {
-    expect(isWindowsTerminalFocused({ className: null, processName: "wezterm" })).toBe(true)
-  })
-
-  test("matches VS Code by process name", () => {
-    expect(isWindowsTerminalFocused({ className: null, processName: "Code" })).toBe(true)
-  })
-
-  test("matches cursor by process name", () => {
-    expect(isWindowsTerminalFocused({ className: null, processName: "cursor" })).toBe(true)
-  })
-
-  test("returns false for non-terminal class and process", () => {
-    expect(isWindowsTerminalFocused({ className: "Chrome_WidgetWin_1", processName: "chrome" })).toBe(false)
-  })
-
-  test("returns false when both are null", () => {
-    expect(isWindowsTerminalFocused({ className: null, processName: null })).toBe(false)
-  })
-
-  test("is case insensitive", () => {
-    expect(isWindowsTerminalFocused({ className: "CASCADIA_HOSTING_WINDOW_CLASS", processName: null })).toBe(true)
-    expect(isWindowsTerminalFocused({ className: "cascadia_hosting_window_class", processName: null })).toBe(true)
-    expect(isWindowsTerminalFocused({ className: null, processName: "WindowsTerminal" })).toBe(true)
-    expect(isWindowsTerminalFocused({ className: null, processName: "windowsterminal" })).toBe(true)
-  })
-
-  test("matches when either class or process name matches", () => {
-    expect(isWindowsTerminalFocused({ className: "CASCADIA_HOSTING_WINDOW_CLASS", processName: "chrome" })).toBe(true)
-    expect(isWindowsTerminalFocused({ className: "Chrome_WidgetWin_1", processName: "WindowsTerminal" })).toBe(true)
+describe("parseWindowsFocusOutput", () => {
+  test("only an exact focused line counts", () => {
+    expect(parseWindowsFocusOutput("focused")).toBe(true)
+    expect(parseWindowsFocusOutput("#< CLIXML\r\nfocused\r\n")).toBe(true)
+    for (const output of ["other", "none", "noconsole", "unfocused", "", null]) {
+      expect(parseWindowsFocusOutput(output)).toBe(false)
+    }
   })
 })
 
-describe("getWindowsActiveWindowInfo on Windows", () => {
-  test("PowerShell command produces valid 'class|process' output", () => {
-    // Only run this test on Windows (the P/Invoke won't work elsewhere)
-    // This is an integration test that verifies the actual PowerShell command
-    // works correctly — catches Win32 API issues, CLIXML problems, etc.
+describe("buildWindowsFocusScript", () => {
+  test("targets the given process console and ancestry", () => {
+    const script = buildWindowsFocusScript(4242)
+    expect(script).toContain("AttachConsole(4242)")
+    expect(script).toContain("$p=4242;")
+    // Without Stop, failed Win32 calls leave nulls that compare equal and print "focused".
+    expect(script.startsWith("$ErrorActionPreference='Stop'")).toBe(true)
+  })
+
+  test("runs under PowerShell and prints a verdict", () => {
+    // Win32 integration check; P/Invoke only exists on Windows.
     if (process.platform !== "win32") return
     const { execFileSync } = require("child_process")
-    const script = `
-$p=Add-Type -Name NFI_Test -Namespace OpenCodeNotifier -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();[DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetClassName(IntPtr h,System.Text.StringBuilder b,int n);[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);' -PassThru;
-$h=$p::GetForegroundWindow();
-if(!$h){Write-Output 'null|null';return}
-$sb=New-Object System.Text.StringBuilder 256;
-$p::GetClassName($h,$sb,256)|Out-Null;
-$c=$sb.ToString();
-$procId=0;
-$p::GetWindowThreadProcessId($h,[ref]$procId)|Out-Null;
-try{$pn=(Get-Process -Id $procId -ErrorAction SilentlyContinue).ProcessName}catch{}
-if(!$pn){$pn=''}
-Write-Output "$c|$pn"
-`.trim().replace(/\n/g, "; ")
-
-    const raw = execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], {
+    const encoded = Buffer.from(buildWindowsFocusScript(process.pid), "utf16le").toString("base64")
+    const output: string = execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded], {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "ignore"],
-      timeout: 5000,
+      timeout: 15000,
       windowsHide: true,
-    }).trim()
-
-    // PowerShell may prepend a CLIXML marker/warning line; ignore it, same as
-    // the production parser.
-    const result = raw
-      .split("\n")
-      .map((l) => l.trim())
-      .find((l) => l.length > 0 && !l.startsWith("#<")) ?? raw
-
-    // The result must contain '|' and must have a non-empty process name
-    expect(result).toContain("|")
-    const [className, processName] = result.split("|")
-    // In headless/service contexts GetForegroundWindow() can be null, which the
-    // script reports as 'null|null'. Skip the content assertions in that case.
-    if (className === "null" && processName === "null") return
-    expect(className).toBeTruthy()
-    expect(processName).toBeTruthy()
-    // Class name should be a real Windows window class (at least 3 chars)
-    expect(className.length).toBeGreaterThan(2)
+    })
+    const verdict = output.split(/\r?\n/).map(line => line.trim()).filter(Boolean).at(-1)
+    expect(["focused", "other", "none", "noconsole"]).toContain(verdict)
   })
 })
 
