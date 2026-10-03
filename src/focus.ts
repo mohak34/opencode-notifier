@@ -2,6 +2,7 @@ import { execFile, execFileSync, execSync } from "child_process"
 import { accessSync, constants, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
 import { delimiter, join } from "path"
+import { getWindowsFocus } from "./focus-windows"
 
 const LINUX_TERMINAL_APPS = new Set<string>([
   "ghostty",
@@ -374,54 +375,9 @@ export function debugFocusState(message: string): void {
   }
 }
 
-// Windows focus is decided against the console OpenCode is attached to, not
-// against a list of terminal class names. Windows Terminal and conhost own
-// that console's window, so a handle compare tells our window from any other
-// terminal or editor. Hosts that leave the ConPTY window unowned (VS Code,
-// WezTerm, Alacritty) fall back to "the foreground window's process is one of
-// our ancestors". Prints "focused", "other", "none" or "noconsole"; any error
-// stops the script before a verdict, which fails open.
-export function buildWindowsFocusScript(pid: number): string {
-  return `
-$ErrorActionPreference='Stop'
-$k=Add-Type -Name Focus -Namespace OpenCodeNotifier -PassThru -MemberDefinition '
-[DllImport("kernel32.dll")] public static extern bool FreeConsole();
-[DllImport("kernel32.dll")] public static extern bool AttachConsole(uint p);
-[DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
-[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
-[DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr h, uint f);
-[DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
-[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint p);'
-$fg=$k::GetForegroundWindow()
-if($fg -eq [IntPtr]::Zero){'none';return}
-[void]$k::FreeConsole()
-if(-not $k::AttachConsole(${pid})){'noconsole';return}
-$c=$k::GetConsoleWindow()
-$root=$k::GetAncestor($c,3)
-if($root -ne [IntPtr]::Zero -and $fg -eq $root){'focused';return}
-if($root -ne $c -or ($c -ne [IntPtr]::Zero -and $k::IsWindowVisible($c))){'other';return}
-$fp=[uint32]0
-[void]$k::GetWindowThreadProcessId($fg,[ref]$fp)
-$parents=@{}
-Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId|%{$parents[[int]$_.ProcessId]=[int]$_.ParentProcessId}
-$p=${pid};$seen=@{}
-while($p -and -not $seen[$p]){if($p -eq $fp){'focused';return};$seen[$p]=1;$p=$parents[$p]}
-'other'
-`.trim()
-}
-
-// PowerShell may print CLIXML or warnings around the verdict; only an exact
-// "focused" line counts. Anything else fails open so the alert is delivered.
-export function parseWindowsFocusOutput(output: string | null): boolean {
-  return !!output?.split(/\r?\n/).some(line => line.trim() === "focused")
-}
-
-function isWindowsConsoleFocused(): boolean {
-  const encoded = Buffer.from(buildWindowsFocusScript(process.pid), "utf16le").toString("base64")
-  const args = ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded]
-  const output = execFileWithTimeout("powershell", args, 5000) ?? execFileWithTimeout("pwsh", args, 5000)
-  const focused = parseWindowsFocusOutput(output)
-  debugFocusState(`windows focus: pid=${process.pid} result=${output ?? "null"} focused=${focused}`)
+function isWindowsHostFocused(): boolean {
+  const { focused, reason, output } = getWindowsFocus()
+  debugFocusState(`windows focus: ${reason} focused=${focused} probe=${output ?? "null"}`)
   return focused
 }
 
@@ -619,7 +575,7 @@ export function isTerminalFocused(): boolean {
       return true
     }
 
-    if (process.platform === "win32") return isWindowsConsoleFocused()
+    if (process.platform === "win32") return isWindowsHostFocused()
 
     const tmuxPaneActive = process.env.TMUX ? isTmuxPaneActive() : null
     const currentWindowId = getActiveWindowId()

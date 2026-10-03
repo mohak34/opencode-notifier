@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test"
 import { isZellijPaneFocused } from "./focus"
-import { isLinuxTerminalFocused, isMacTerminalAppFocused, isTmuxPaneFocused, parseWezTermFocusedPaneId, isKDEJumpBackSupported, captureStartupWindowId, focusTerminal, getCachedWindowTitle, buildWindowsFocusScript, parseWindowsFocusOutput, buildOsascriptActivateAppArgs, findQdbusBinary, resolveQdbusBinary, isGnomeLikeSession, getLinuxFocusBackendName, parseAtspiString, parseAtspiObjectRefs, parseAtspiStateActive, isAtspiTerminalWindow, isAtspiWindowRoleAccepted } from "./focus"
+import { isLinuxTerminalFocused, isMacTerminalAppFocused, isTmuxPaneFocused, parseWezTermFocusedPaneId, isKDEJumpBackSupported, captureStartupWindowId, focusTerminal, getCachedWindowTitle, buildOsascriptActivateAppArgs, findQdbusBinary, resolveQdbusBinary, isGnomeLikeSession, getLinuxFocusBackendName, parseAtspiString, parseAtspiObjectRefs, parseAtspiStateActive, isAtspiTerminalWindow, isAtspiWindowRoleAccepted } from "./focus"
 
 describe("isMacTerminalAppFocused", () => {
   test("matches Terminal when TERM_PROGRAM is Apple_Terminal", () => {
@@ -147,41 +147,6 @@ describe("Zellij pane focus", () => {
     expect(isZellijPaneFocused("3", "CLIENT_ID ZELLIJ_PANE_ID RUNNING_COMMAND")).toBe(false)
     expect(isZellijPaneFocused("3", "Error: session not found")).toBe(false)
     expect(isZellijPaneFocused("plugin_2", clients)).toBe(false)
-  })
-})
-
-describe("parseWindowsFocusOutput", () => {
-  test("only an exact focused line counts", () => {
-    expect(parseWindowsFocusOutput("focused")).toBe(true)
-    expect(parseWindowsFocusOutput("#< CLIXML\r\nfocused\r\n")).toBe(true)
-    for (const output of ["other", "none", "noconsole", "unfocused", "", null]) {
-      expect(parseWindowsFocusOutput(output)).toBe(false)
-    }
-  })
-})
-
-describe("buildWindowsFocusScript", () => {
-  test("targets the given process console and ancestry", () => {
-    const script = buildWindowsFocusScript(4242)
-    expect(script).toContain("AttachConsole(4242)")
-    expect(script).toContain("$p=4242;")
-    // Without Stop, failed Win32 calls leave nulls that compare equal and print "focused".
-    expect(script.startsWith("$ErrorActionPreference='Stop'")).toBe(true)
-  })
-
-  test("runs under PowerShell and prints a verdict", () => {
-    // Win32 integration check; P/Invoke only exists on Windows.
-    if (process.platform !== "win32") return
-    const { execFileSync } = require("child_process")
-    const encoded = Buffer.from(buildWindowsFocusScript(process.pid), "utf16le").toString("base64")
-    const output: string = execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded], {
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "ignore"],
-      timeout: 15000,
-      windowsHide: true,
-    })
-    const verdict = output.split(/\r?\n/).map(line => line.trim()).filter(Boolean).at(-1)
-    expect(["focused", "other", "none", "noconsole"]).toContain(verdict)
   })
 })
 
