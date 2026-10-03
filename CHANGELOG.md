@@ -6,8 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- Windows focus suppression compares the foreground window with the window hosting OpenCode's console instead of matching any terminal or editor. Another terminal window, VS Code, or Cursor in front no longer silences alerts. Detection errors deliver the alert instead of suppressing it, and `OPENCODE_NOTIFIER_DEBUG=1` logs each Windows decision (#130).
-- Windows sound playback honors `volume` and `volumes` (#130).
+- Windows focus suppression applies only when the window hosting OpenCode is in front, instead of whenever any terminal or editor is. Another terminal window, File Explorer, or an unrelated VS Code window no longer silences alerts. Uncertain cases deliver the alert, and `OPENCODE_NOTIFIER_DEBUG=1` logs each Windows decision (#130).
+- A sound volume of `0` skips playback on every platform without blocking the next audible sound (#130).
 
 ## [0.6.0] - 2026-09-30
 

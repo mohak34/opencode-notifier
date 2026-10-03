@@ -146,20 +146,11 @@ async function playOnMac(soundPath: string, volume: number): Promise<void> {
   await runCommand("afplay", ["-v", `${volume}`, soundPath])
 }
 
-// SoundPlayer has no volume control, so set this PowerShell process's wave
-// output level first. Vista+ scopes waveOutSetVolume to the calling process.
-export function buildWindowsSoundScript(soundPath: string, volume: number): string {
-  const play = `(New-Object Media.SoundPlayer '${soundPath.replace(/'/g, "''")}').PlaySync()`
-  if (volume >= 1) return play
-  const level = Math.round(volume * 0xffff)
-  const both = ((level << 16) | level) >>> 0
-  return `$w=Add-Type -Name Volume -Namespace OpenCodeNotifier -PassThru -MemberDefinition '[DllImport("winmm.dll")] public static extern int waveOutSetVolume(IntPtr h, uint v);'
-[void]$w::waveOutSetVolume([IntPtr]::Zero, ${both})
-${play}`
-}
-
-async function playOnWindows(soundPath: string, volume: number): Promise<void> {
-  const encoded = Buffer.from(buildWindowsSoundScript(soundPath, volume), "utf16le").toString("base64")
+// SoundPlayer has no volume control. Setting the mixer instead would persist
+// as PowerShell's per-app volume, so Windows plays at the current level.
+async function playOnWindows(soundPath: string): Promise<void> {
+  const script = `(New-Object Media.SoundPlayer '${soundPath.replace(/'/g, "''")}').PlaySync()`
+  const encoded = Buffer.from(script, "utf16le").toString("base64")
   await runCommand("powershell", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded])
 }
 
@@ -168,8 +159,13 @@ export async function playSound(
   customPath: string | null,
   volume: number
 ): Promise<void> {
-  // Resolve before claiming: an event with no sound file (no custom path
-  // and no bundled wav) must not consume the shared slot (#119 review).
+  // Resolve before claiming: a muted event or one with no sound file (no
+  // custom path and no bundled wav) must not consume the shared slot (#119 review).
+  const normalizedVolume = normalizeVolume(volume)
+  if (normalizedVolume === 0) {
+    return
+  }
+
   const soundPath = getSoundFilePath(event, customPath)
   if (!soundPath) {
     return
@@ -178,8 +174,6 @@ export async function playSound(
   if (!claimSoundSlot(event)) {
     return
   }
-
-  const normalizedVolume = normalizeVolume(volume)
 
   const os = platform()
 
@@ -192,7 +186,7 @@ export async function playSound(
         await playOnLinux(soundPath, normalizedVolume)
         break
       case "win32":
-        await playOnWindows(soundPath, normalizedVolume)
+        await playOnWindows(soundPath)
         break
       default:
         break
