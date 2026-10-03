@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-03
+
+### Fixed
+
+- Hyprland click-to-focus works on Lua configs (Hyprland 0.55+). The legacy `focuswindow` dispatch is tried first and falls back to `hl.dsp.focus` when Hyprland rejects it. Focus suppression was unaffected.
+
 ## [0.6.0] - 2026-09-30
 
 ### Added
