@@ -1176,6 +1176,7 @@ export async function focusTerminal(): Promise<void> {
     const env = process.env
     if (env.WAYLAND_DISPLAY && isGnomeLikeSession(env) && cachedWindowId?.startsWith("gnome:")) {
       const result = callGnomeBridge("ActivateWindow", [cachedWindowId.slice("gnome:".length)])
+      debugFocusState(`GNOME jump-back ActivateWindow ${cachedWindowId} -> ${result ?? "null"}`)
       if (result !== "(true,)") debugFocusState("GNOME jump-back could not activate the captured window")
       return
     }

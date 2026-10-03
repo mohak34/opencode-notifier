@@ -68,6 +68,145 @@ function detectNotifySendCapabilities(): Promise<boolean> {
   })
 }
 
+// Local copy of the debug gate: importing it from ./focus would run that
+// module's import-time window probing (D-Bus I/O) for every notify consumer.
+function debugNotify(message: string): void {
+  if (process.env.OPENCODE_NOTIFIER_DEBUG) {
+    console.error(`[opencode-notifier] ${message}`)
+  }
+}
+
+// A nonzero notify-send exit within this window means it never entered
+// --action/--wait mode (e.g. "Actions are not supported ... Displaying
+// non-interactively"), as opposed to a daemon error after serving the popup.
+const FAST_EXIT_THRESHOLD_MS = 500
+
+export function isNotifySendActionBroken(stderr: string, exitCode: number | null, elapsedMs: number): boolean {
+  // libnotify >= 0.8 refuses --action mode on Notification Spec 1.2 servers
+  // (e.g. GNOME Shell 50): "Actions are not supported by this notifications
+  // server. Displaying non-interactively.", exiting fast without waiting for
+  // the click. The server itself still honors actions sent over D-Bus.
+  if (/actions are not supported|non-interactively/i.test(stderr)) return true
+  if (exitCode !== 0 && exitCode !== null && elapsedMs < FAST_EXIT_THRESHOLD_MS) return true
+  return false
+}
+
+function notifyOverDbus(
+  title: string,
+  message: string,
+  timeout: number,
+  replacesId: number,
+  iconPath?: string,
+  grouping: boolean = true,
+  actionLabel: string = LINUX_FOCUS_ACTION_LABEL
+): Promise<number | null> {
+  return new Promise((resolve) => {
+    // notify-send --action is unavailable here; talk to
+    // org.freedesktop.Notifications directly with the same action payload.
+    // Notify(app_name, replaces_id, app_icon, summary, body, actions, hints, expire_timeout)
+    // gdbus parses each argument as GVariant text, so strings go in as quoted
+    // literals. JSON string escapes are valid GVariant string escapes.
+    execFile(
+      "gdbus",
+      [
+        "call", "--session", "--dest", "org.freedesktop.Notifications",
+        "--object-path", "/org/freedesktop/Notifications",
+        "--method", "org.freedesktop.Notifications.Notify",
+        "--",
+        JSON.stringify("opencode"), String(replacesId), JSON.stringify(iconPath ?? ""),
+        JSON.stringify(title), JSON.stringify(message),
+        `[${JSON.stringify(LINUX_FOCUS_ACTION_KEY)}, ${JSON.stringify(actionLabel)}]`,
+        "{}", String(Math.max(1, timeout) * 1000),
+      ],
+      (error, stdout) => {
+        if (error || !stdout) {
+          resolve(null)
+          return
+        }
+        const match = stdout.match(/uint32\s+(\d+)/)
+        const id = match ? parseInt(match[1], 10) : NaN
+        if (isNaN(id)) {
+          resolve(null)
+          return
+        }
+        if (grouping) {
+          lastLinuxNotificationId = id
+        }
+        resolve(id)
+      }
+    )
+  })
+}
+
+// One click listener per notification id. Replacing a notification keeps its
+// id, so a new listener retires the old one instead of firing both callbacks.
+const dbusActionListeners = new Map<number, () => void>()
+
+function watchDbusAction(id: number, timeout: number, onAction: (action: NotificationAction) => void): void {
+  dbusActionListeners.get(id)?.()
+
+  const monitor = spawn("dbus-monitor", [
+    "type='signal',path='/org/freedesktop/Notifications',interface='org.freedesktop.Notifications',member='ActionInvoked'",
+  ], { stdio: ["ignore", "pipe", "pipe"] })
+  const stop = () => {
+    clearTimeout(expiry)
+    if (dbusActionListeners.get(id) === stop) dbusActionListeners.delete(id)
+    try { monitor.kill() } catch {}
+  }
+  const expiry = setTimeout(stop, Math.max(1, timeout) * 1000 + 1000)
+  expiry.unref()
+  dbusActionListeners.set(id, stop)
+
+  // dbus-monitor prints a header line per message, then one indented line per
+  // argument. ActionInvoked is (uint32 id, string action_key); both must
+  // belong to the same signal.
+  let partial = ""
+  let signal: { id?: number } | null = null
+  monitor.stdout?.on("data", (data) => {
+    const lines = (partial + data.toString()).split("\n")
+    partial = lines.pop() ?? ""
+    for (const line of lines) {
+      if (!/^\s/.test(line)) {
+        signal = line.includes("member=ActionInvoked") ? {} : null
+        continue
+      }
+      if (!signal) continue
+      if (signal.id === undefined) {
+        const idMatch = line.match(/^\s+uint32 (\d+)$/)
+        signal = idMatch ? { id: parseInt(idMatch[1], 10) } : null
+        continue
+      }
+      const actionMatch = line.match(/^\s+string "(.*)"$/)
+      const matched = signal.id === id && actionMatch?.[1] === LINUX_FOCUS_ACTION_KEY
+      signal = null
+      if (matched && dbusActionListeners.get(id) === stop) {
+        stop()
+        try { onAction("focus") } catch {}
+      }
+    }
+  })
+  monitor.stderr?.resume()
+  monitor.on("close", stop)
+  monitor.on("error", stop)
+}
+
+function sendLinuxNotificationViaDbus(
+  title: string,
+  message: string,
+  timeout: number,
+  replacesId: number,
+  iconPath?: string,
+  grouping: boolean = true,
+  onAction?: (action: NotificationAction) => void,
+  actionLabel: string = LINUX_FOCUS_ACTION_LABEL
+): Promise<void> {
+  return notifyOverDbus(title, message, timeout, replacesId, iconPath, grouping, actionLabel).then((id) => {
+    if (id !== null && onAction) {
+      watchDbusAction(id, timeout, onAction)
+    }
+  })
+}
+
 function sendLinuxNotificationDirect(
   title: string,
   message: string,
@@ -148,12 +287,29 @@ async function sendLinuxNotificationWithActions(
 
   return new Promise((resolve) => {
     const child = spawn("notify-send", args, { stdio: ["ignore", "pipe", "pipe"] })
+    const startedAt = Date.now()
 
     let stdout = ""
+    let stderr = ""
     let clicked = false
+    let fallbackStarted = false
+    // notify-send still shows a non-interactive popup when it refuses
+    // --action. The fallback replaces it rather than stacking a second one.
+    let shownId: number | null = null
     // Some daemons ignore expiry. Bound each action listener so it cannot accumulate forever.
     const expiry = setTimeout(() => child.kill(), Math.max(1, timeout) * 1000 + 1000)
     expiry.unref()
+
+    const fallbackToDbus = () => {
+      if (fallbackStarted || clicked) return false
+      fallbackStarted = true
+      debugNotify("notify-send --action unsupported by this notification server, falling back to raw D-Bus Notify")
+      const replacesId = shownId ?? (grouping ? lastLinuxNotificationId : null) ?? 0
+      sendLinuxNotificationViaDbus(title, message, timeout, replacesId, iconPath, grouping, onAction, actionLabel)
+        .then(() => resolve())
+        .catch(() => resolve())
+      return true
+    }
 
     const consumeStdout = () => {
       const lines = stdout.split(/\r?\n/)
@@ -172,6 +328,7 @@ async function sendLinuxNotificationWithActions(
         }
 
         if (parsed.type === "id") {
+          shownId = parsed.id
           if (grouping) {
             lastLinuxNotificationId = parsed.id
           }
@@ -190,20 +347,30 @@ async function sendLinuxNotificationWithActions(
       stdout += data.toString()
       consumeStdout()
     })
-    child.stderr?.resume()
+    child.stderr?.on("data", (data) => {
+      stderr += data.toString()
+    })
 
-    child.on("close", () => {
+    child.on("close", (code: number | null) => {
       clearTimeout(expiry)
       // Flush any remaining buffered stdout when process exits.
       if (stdout.trim().length > 0) {
         stdout += "\n"
         consumeStdout()
       }
+      if (
+        onAction &&
+        isNotifySendActionBroken(stderr, code, Date.now() - startedAt) &&
+        fallbackToDbus()
+      ) return
       resolve()
     })
 
     child.on("error", () => {
       clearTimeout(expiry)
+      // notify-send missing or not executable: D-Bus is the only chance
+      // left for a clickable popup.
+      if (onAction && fallbackToDbus()) return
       resolve()
     })
   })

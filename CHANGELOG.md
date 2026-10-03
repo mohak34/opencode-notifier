@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Linux: clickable notification actions survive `notify-send` versions that refuse `--action` mode (issue #106).
+  - `notify-send` 0.8+ reports "Actions are not supported by this notifications server" on Notification Spec 1.2 servers (e.g. GNOME Shell 50), shows the popup without its button, and exits, so **Jump to terminal** / **Run command** never fired.
+  - When that happens (or `notify-send` is missing), the plugin replaces that popup over D-Bus (`org.freedesktop.Notifications.Notify`) with one carrying the action and watches `ActionInvoked` with `dbus-monitor` for the click. Requires `gdbus` and `dbus-monitor` on `PATH` (both already required for GNOME focus features).
+
 ## [0.6.1] - 2026-10-03
 
 ### Fixed
