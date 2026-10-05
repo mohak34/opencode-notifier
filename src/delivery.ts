@@ -10,13 +10,14 @@ import {
   getIconPath,
   interpolateMessage,
   getStatePath,
+  CHANNELS,
 } from "./config"
-import type { EventType, MessageContext, NotifierConfig } from "./config"
+import type { Channel, EventType, MessageContext, NotifierConfig } from "./config"
 import { sendNotification } from "./notify"
 import { playSound } from "./sound"
 import { ringBell } from "./bell"
 import { runCommand } from "./command"
-import { isTerminalFocused, focusTerminal, isTerminalJumpBackSupported } from "./focus"
+import { isTerminalFocused, focusTerminal, isTerminalJumpBackSupported, debugFocusState } from "./focus"
 
 let globalTurnCount: number | null = null
 
@@ -96,7 +97,10 @@ export async function handleEvent(
   sessionID?: string | null,
   agentName?: string | null
 ): Promise<void> {
-  if (config.suppressWhenFocused && isTerminalFocused()) {
+  // Focus is only queried when some channel cares about it.
+  const focusChannels = config.suppressWhenFocused === true ? CHANNELS : config.suppressWhenFocused || []
+  const muted = new Set<Channel>(focusChannels.length > 0 && isTerminalFocused() ? focusChannels : [])
+  if (muted.size === CHANNELS.length) {
     return
   }
 
@@ -124,7 +128,7 @@ export async function handleEvent(
   }
   const message = interpolateMessage(rawMessage, context)
 
-  const notificationEnabled = isEventNotificationEnabled(config, eventType)
+  const notificationEnabled = isEventNotificationEnabled(config, eventType) && !muted.has("notification")
   if (notificationEnabled) {
     const title = getNotificationTitle(config, context)
     const iconPath = getIconPath(config)
@@ -134,16 +138,20 @@ export async function handleEvent(
     const onNotificationClick = focusOnClick || (clickCommand.enabled && clickCommand.path) ? () => {
       if (clicked) return
       clicked = true
+      debugFocusState(`notification activated (event=${eventType}), focusOnClick=${focusOnClick}`)
       if (clickCommand.enabled) {
         runCommand({ ...config, command: clickCommand }, eventType, message, sessionTitle, agentName, projectName, timestamp, turn, sessionID)
       }
-      if (focusOnClick) void focusTerminal().catch(() => {})
+      if (focusOnClick) void focusTerminal().then(
+        () => debugFocusState("focusTerminal() finished"),
+        (error) => debugFocusState(`focusTerminal() threw: ${String(error)}`)
+      )
     } : undefined
     promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping,
       onNotificationClick, config.windows.appID, focusOnClick ? "Jump to terminal" : "Run command"))
   }
 
-  if (isEventSoundEnabled(config, eventType)) {
+  if (isEventSoundEnabled(config, eventType) && !muted.has("sound")) {
     const customSoundPath = getSoundPath(config, eventType)
     const ghosttyOnMac = process.platform === "darwin" && config.notificationSystem === "ghostty" && notificationEnabled && config.suppressGhosttySound
     if (!ghosttyOnMac) {
@@ -152,13 +160,14 @@ export async function handleEvent(
     }
   }
 
-  if (isEventBellEnabled(config, eventType)) {
+  if (isEventBellEnabled(config, eventType) && !muted.has("bell")) {
     promises.push(ringBell())
   }
 
   const minDuration = config.command?.minDuration
   const shouldSkipCommand =
     !isEventCommandEnabled(config, eventType) ||
+    muted.has("command") ||
     (typeof minDuration === "number" &&
       Number.isFinite(minDuration) &&
       minDuration > 0 &&

@@ -4,10 +4,36 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `suppressWhenFocused` accepts a list of channels, so `["notification"]` hides popups while the terminal is focused but still plays sounds (issue #135).
+
 ### Fixed
 
 - Windows focus suppression applies only when the window hosting OpenCode is in front, instead of whenever any terminal or editor is. Another terminal window, File Explorer, or an unrelated VS Code window no longer silences alerts. Uncertain cases deliver the alert, and `OPENCODE_NOTIFIER_DEBUG=1` logs each Windows decision (#130).
 - A sound volume of `0` skips playback on every platform without blocking the next audible sound (#130).
+
+### Upgrade notes
+
+- `true` and `false` work as before.
+
+## [0.7.0] - 2026-10-03
+
+### Fixed
+
+- Linux: clickable notification actions survive `notify-send` versions that refuse `--action` mode (issue #106).
+  - `notify-send` 0.8+ reports "Actions are not supported by this notifications server" on Notification Spec 1.2 servers (e.g. GNOME Shell 50), shows the popup without its button, and exits, so **Jump to terminal** / **Run command** never fired.
+  - When that happens (or `notify-send` is missing), the plugin replaces that popup over D-Bus (`org.freedesktop.Notifications.Notify`) with one carrying the action and watches `ActionInvoked` with `dbus-monitor` for the click. Requires `gdbus` and `dbus-monitor` on `PATH` (both already required for GNOME focus features).
+
+### Contributors
+
+- Thanks to @LiberiFatali for the D-Bus action fallback on GNOME 50 in #129.
+
+## [0.6.1] - 2026-10-03
+
+### Fixed
+
+- Hyprland click-to-focus works on Lua configs (Hyprland 0.55+). The legacy `focuswindow` dispatch is tried first and falls back to `hl.dsp.focus` when Hyprland rejects it. Focus suppression was unaffected.
 
 ## [0.6.0] - 2026-09-30
 

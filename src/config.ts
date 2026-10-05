@@ -24,6 +24,10 @@ export interface EventConfig {
   bell: boolean
 }
 
+export type Channel = keyof EventConfig
+
+export const CHANNELS: Channel[] = ["sound", "notification", "bell", "command"]
+
 export interface CommandConfig {
   enabled: boolean
   path: string
@@ -58,7 +62,8 @@ export interface NotifierConfig {
   showSessionTitle: boolean
   showIcon: boolean
   customIconPath: string | null
-  suppressWhenFocused: boolean
+  // true skips every channel while the terminal is focused; a list skips only those channels.
+  suppressWhenFocused: boolean | Channel[]
   focusOnClick: boolean
   enableOnDesktop: boolean
   notificationSystem: "osascript" | "node-notifier" | "ghostty"
@@ -253,6 +258,11 @@ function parseEventConfig(
   }
 }
 
+function parseSuppressWhenFocused(value: unknown): boolean | Channel[] {
+  if (Array.isArray(value)) return CHANNELS.filter(channel => value.includes(channel))
+  return typeof value === "boolean" ? value : DEFAULT_CONFIG.suppressWhenFocused
+}
+
 function parseVolume(value: unknown, defaultVolume: number): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return defaultVolume
@@ -318,7 +328,7 @@ export function loadConfig(): NotifierConfig {
       showSessionTitle: userConfig.showSessionTitle ?? DEFAULT_CONFIG.showSessionTitle,
       showIcon: userConfig.showIcon ?? DEFAULT_CONFIG.showIcon,
       customIconPath: userConfig.customIconPath ?? DEFAULT_CONFIG.customIconPath,
-      suppressWhenFocused: userConfig.suppressWhenFocused ?? DEFAULT_CONFIG.suppressWhenFocused,
+      suppressWhenFocused: parseSuppressWhenFocused(userConfig.suppressWhenFocused),
       focusOnClick: typeof userConfig.focusOnClick === "boolean" ? userConfig.focusOnClick : DEFAULT_CONFIG.focusOnClick,
       enableOnDesktop: typeof userConfig.enableOnDesktop === "boolean" ? userConfig.enableOnDesktop : DEFAULT_CONFIG.enableOnDesktop,
       notificationSystem:

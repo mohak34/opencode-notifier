@@ -1040,9 +1040,14 @@ findAndActivateTerminal();
 function focusLinuxWindowHyprland(windowId: string): void {
   if (!isSafeCompositorWindowId(windowId)) return
 
+  // Lua configs (Hyprland 0.55+) reject the legacy dispatch with a non-zero exit, so retry with the hl.dsp form.
   try {
     execFileSync("hyprctl", ["dispatch", "focuswindow", `address:${windowId}`], { timeout: 1000, stdio: "ignore" })
   } catch {
+    try {
+      execFileSync("hyprctl", ["dispatch", `hl.dsp.focus({ window = "address:${windowId}" })`], { timeout: 1000, stdio: "ignore" })
+    } catch {
+    }
   }
 }
 
@@ -1105,6 +1110,7 @@ export async function focusTerminal(): Promise<void> {
     const env = process.env
     if (env.WAYLAND_DISPLAY && isGnomeLikeSession(env) && cachedWindowId?.startsWith("gnome:")) {
       const result = callGnomeBridge("ActivateWindow", [cachedWindowId.slice("gnome:".length)])
+      debugFocusState(`GNOME jump-back ActivateWindow ${cachedWindowId} -> ${result ?? "null"}`)
       if (result !== "(true,)") debugFocusState("GNOME jump-back could not activate the captured window")
       return
     }
