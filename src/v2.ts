@@ -37,7 +37,29 @@ export function createV2Notifier(client: Client, location: LocationRef, delivery
     },
   }, location.directory, delivery)
   const seen = new Set<string>()
+  const owned = new Map<string, Promise<boolean>>()
   let disposed = false
+
+  function here(other: { directory: string; workspaceID?: string }) {
+    return other.directory === location.directory && other.workspaceID === location.workspaceID
+  }
+
+  // Some V2 events carry only a sessionID, so ownership comes from the session itself.
+  // Lookup failures fail open and are retried on the next event.
+  function ours(sessionID: string) {
+    let result = owned.get(sessionID)
+    if (!result) {
+      result = client.session.get({ sessionID }).then(
+        session => !session.location || here(session.location),
+        () => {
+          owned.delete(sessionID)
+          return true
+        },
+      )
+      owned.set(sessionID, result)
+    }
+    return result
+  }
 
   function first(key: string) {
     if (seen.has(key)) return false
@@ -55,10 +77,11 @@ export function createV2Notifier(client: Client, location: LocationRef, delivery
     async event(event: OpenCodeEvent) {
       try {
         if (disposed) return
+        const sessionID = event.type === "form.created" ? event.data.form.sessionID : "sessionID" in event.data ? event.data.sessionID : undefined
+        if (sessionID && event.type === "session.moved") owned.delete(sessionID)
         if (event.location) {
-          const workspaceID = "workspaceID" in event.location ? event.location.workspaceID : undefined
-          if (event.location.directory !== location.directory || workspaceID !== location.workspaceID) return
-        }
+          if (!here(event.location)) return
+        } else if (sessionID && !(await ours(sessionID))) return
         switch (event.type) {
           case "session.created":
             if (first(`created:${event.data.sessionID}`)) {
@@ -83,6 +106,7 @@ export function createV2Notifier(client: Client, location: LocationRef, delivery
             }
             break
           case "session.deleted":
+            owned.delete(event.data.sessionID)
             await notifier.stopped(event.data.sessionID)
             break
           case "permission.asked":
@@ -108,6 +132,7 @@ export function createV2Notifier(client: Client, location: LocationRef, delivery
       disposed = true
       notifier.dispose()
       seen.clear()
+      owned.clear()
     },
   }
 }

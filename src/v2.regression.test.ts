@@ -28,6 +28,7 @@ async function exercise(events: OpenCodeEvent[], options: {
   command?: boolean
   messageAge?: number
   agentName?: string
+  sessionLocation?: { directory: string; workspaceID?: string }
 } = {}) {
   writeFileSync(configPath, JSON.stringify({
     suppressWhenFocused: false, sound: false, bell: false, notificationSystem: "ghostty",
@@ -50,7 +51,7 @@ async function exercise(events: OpenCodeEvent[], options: {
     session: {
       get: async () => {
         if (options.missing) throw new Error("Session not found")
-        return { id: "session", title: "test", ...(options.child ? { parentID: "parent", agent: options.agentName } : {}) }
+        return { id: "session", title: "test", location: options.sessionLocation, ...(options.child ? { parentID: "parent", agent: options.agentName } : {}) }
       },
       context: async () => [{ id: "message", type: "user", text: "hello", time: { created: Date.now() - (options.messageAge ?? 1000) } } satisfies SessionMessageUser],
     },
@@ -131,6 +132,22 @@ test("resolved permissions and non-user interruptions stay silent", async () => 
 test("events from a different project do not notify", async () => {
   const input = { ...event("session.execution.succeeded", { sessionID: "s" }), location: { directory: "/other-project" } }
   expect((await exercise([input])).length).toBe(0)
+})
+
+test("location-less events from another project's session do not notify", async () => {
+  const finished = event("session.execution.succeeded", { sessionID: "foreign" })
+  expect((await exercise([finished], { sessionLocation: { directory: "/other-project" } })).length).toBe(0)
+  expect((await exercise([finished], { sessionLocation: { directory: fixture, workspaceID: "other" } })).length).toBe(0)
+})
+
+test("location-less events from this project's session notify", async () => {
+  const finished = event("session.execution.succeeded", { sessionID: "own" })
+  expect((await exercise([finished], { sessionLocation: { directory: fixture } })).length).toBe(1)
+})
+
+test("a failed session lookup fails open", async () => {
+  const question = event("form.created", { form: { id: "lookup", sessionID: "gone", metadata: { kind: "question" } } })
+  expect((await exercise([question], { missing: true })).length).toBe(1)
 })
 
 async function waitForCommands(count: number) {
