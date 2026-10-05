@@ -146,6 +146,8 @@ async function playOnMac(soundPath: string, volume: number): Promise<void> {
   await runCommand("afplay", ["-v", `${volume}`, soundPath])
 }
 
+// SoundPlayer has no volume control. Setting the mixer instead would persist
+// as PowerShell's per-app volume, so Windows plays at the current level.
 async function playOnWindows(soundPath: string): Promise<void> {
   const script = `(New-Object Media.SoundPlayer '${soundPath.replace(/'/g, "''")}').PlaySync()`
   const encoded = Buffer.from(script, "utf16le").toString("base64")
@@ -157,8 +159,13 @@ export async function playSound(
   customPath: string | null,
   volume: number
 ): Promise<void> {
-  // Resolve before claiming: an event with no sound file (no custom path
-  // and no bundled wav) must not consume the shared slot (#119 review).
+  // Resolve before claiming: a muted event or one with no sound file (no
+  // custom path and no bundled wav) must not consume the shared slot (#119 review).
+  const normalizedVolume = normalizeVolume(volume)
+  if (normalizedVolume === 0) {
+    return
+  }
+
   const soundPath = getSoundFilePath(event, customPath)
   if (!soundPath) {
     return
@@ -167,8 +174,6 @@ export async function playSound(
   if (!claimSoundSlot(event)) {
     return
   }
-
-  const normalizedVolume = normalizeVolume(volume)
 
   const os = platform()
 

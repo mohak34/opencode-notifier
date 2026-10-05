@@ -31,4 +31,9 @@ describe("claimSoundSlot", () => {
     await playSound("plan_exit", null, 1)
     expect(claimSoundSlot("complete")).toBe(true)
   })
+
+  test("muted event does not consume the slot", async () => {
+    await playSound("complete", null, 0)
+    expect(claimSoundSlot("permission")).toBe(true)
+  })
 })

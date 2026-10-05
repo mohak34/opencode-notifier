@@ -2,6 +2,7 @@ import { execFile, execFileSync, execSync } from "child_process"
 import { accessSync, constants, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
 import { delimiter, join } from "path"
+import { getWindowsFocus } from "./focus-windows"
 
 const LINUX_TERMINAL_APPS = new Set<string>([
   "ghostty",
@@ -374,61 +375,10 @@ export function debugFocusState(message: string): void {
   }
 }
 
-const WINDOWS_TERMINAL_WINDOW_CLASSES = new Set<string>([
-  "cascadia_hosting_window_class",
-  "consolewindowclass",
-  "windowsterminalwindowclass",
-])
-
-const WINDOWS_TERMINAL_PROCESS_NAMES = new Set<string>([
-  "windowsterminal",
-  "windowsterminalpreview",
-  "conhost",
-  "alacritty",
-  "wezterm",
-  "wezterm-gui",
-  "kitty",
-  "hyper",
-  "cursor",
-  "code",
-  "code - insiders",
-])
-
-interface WindowsWindowInfo {
-  className: string | null
-  processName: string | null
-}
-
-function getWindowsActiveWindowInfo(): WindowsWindowInfo | null {
-  const script = `
-$p=Add-Type -Name NFI -Namespace OpenCodeNotifier -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();[DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetClassName(IntPtr h,System.Text.StringBuilder b,int n);[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);' -PassThru;
-$h=$p::GetForegroundWindow();
-if(!$h){return}
-$sb=New-Object System.Text.StringBuilder 256;
-$p::GetClassName($h,$sb,256)|Out-Null;
-$c=$sb.ToString();
-$procId=0;
-$p::GetWindowThreadProcessId($h,[ref]$procId)|Out-Null;
-$pn='';
-try{$pn=(Get-Process -Id $procId -ErrorAction SilentlyContinue).ProcessName}catch{}
-Write-Output "$c|$pn"
-`.trim().replace(/\n/g, "; ")
-  let output = execFileWithTimeout("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], 5000)
-  if (!output)
-    output = execFileWithTimeout("pwsh", ["-NoProfile", "-NonInteractive", "-Command", script], 1000)
-  if (!output) return null
-  // PowerShell may prepend a CLIXML marker/warning line to stdout; drop it so
-  // the "class|process" parse stays correct.
-  const line = output
-    .split("\n")
-    .map((l) => l.trim())
-    .find((l) => l.length > 0 && !l.startsWith("#<"))
-  if (!line) return null
-  const sep = line.indexOf("|")
-  if (sep === -1) return null
-  const className = line.substring(0, sep) || null
-  const processName = line.substring(sep + 1) || null
-  return { className, processName }
+function isWindowsHostFocused(): boolean {
+  const { focused, reason, output } = getWindowsFocus()
+  debugFocusState(`windows focus: ${reason} focused=${focused} probe=${output ?? "null"}`)
+  return focused
 }
 
 function getMacOSActiveWindowId(): string | null {
@@ -591,16 +541,6 @@ export function isLinuxTerminalFocused(params: {
   return true
 }
 
-export function isWindowsTerminalFocused(params: {
-  className: string | null
-  processName: string | null
-}): boolean {
-  const { className, processName } = params
-  const classLower = className?.toLowerCase() ?? ""
-  const processLower = processName?.toLowerCase() ?? ""
-  return WINDOWS_TERMINAL_WINDOW_CLASSES.has(classLower) || WINDOWS_TERMINAL_PROCESS_NAMES.has(processLower)
-}
-
 function isTmuxPaneActive(): boolean {
   const tmuxPane = process.env.TMUX_PANE ?? null
   const result = execFileWithTimeout("tmux", ["display-message", "-t", tmuxPane ?? "", "-p", "#{session_attached} #{window_active} #{pane_active}"])
@@ -635,13 +575,7 @@ export function isTerminalFocused(): boolean {
       return true
     }
 
-    if (process.platform === "win32") {
-      const info = getWindowsActiveWindowInfo()
-      return isWindowsTerminalFocused({
-        className: info?.className ?? null,
-        processName: info?.processName ?? null,
-      })
-    }
+    if (process.platform === "win32") return isWindowsHostFocused()
 
     const tmuxPaneActive = process.env.TMUX ? isTmuxPaneActive() : null
     const currentWindowId = getActiveWindowId()
