@@ -23,12 +23,15 @@ export interface WindowsFocusDecision {
 // Every uncertain case returns focused=false so the alert is delivered.
 export function decideWindowsFocus(facts: WindowsFocusFacts): WindowsFocusDecision {
   if (!facts.foreground) return { focused: false, reason: "no foreground window" }
+  // Without OpenCode's console the ancestor walk has nothing tying it to a
+  // terminal, so an unrelated launcher window could pass as the host.
+  if (!facts.attached) return { focused: false, reason: "console attach failed" }
 
   const { consoleWindow, consoleOwner } = facts
-  if (facts.attached && consoleOwner && consoleOwner !== consoleWindow) {
+  if (consoleOwner && consoleOwner !== consoleWindow) {
     return { focused: facts.foreground === consoleOwner, reason: "console owner window" }
   }
-  if (facts.attached && consoleWindow && facts.consoleVisible) {
+  if (consoleWindow && facts.consoleVisible) {
     return { focused: facts.foreground === consoleWindow, reason: "console window" }
   }
 
@@ -172,8 +175,10 @@ namespace OpenCodeNotifier {
         FreeConsole();
       }
 
+      // The callback never stops early, so false means the list is incomplete.
+      // Throwing ends the script before any JSON is printed, which fails open.
       Dictionary<uint, List<long>> windowsByProcess = new Dictionary<uint, List<long>>();
-      EnumWindows(delegate (IntPtr window, IntPtr parameter) {
+      bool enumerated = EnumWindows(delegate (IntPtr window, IntPtr parameter) {
         if (!IsWindowVisible(window) || GetWindow(window, GW_OWNER) != IntPtr.Zero) return true;
         if ((GetWindowLong(window, GWL_EXSTYLE) & WS_EX_TOOLWINDOW) != 0) return true;
         uint owner;
@@ -186,6 +191,7 @@ namespace OpenCodeNotifier {
         list.Add(window.ToInt64());
         return true;
       }, IntPtr.Zero);
+      if (!enumerated) throw new InvalidOperationException("EnumWindows failed");
 
       Dictionary<uint, ProcessEntry> processes = new Dictionary<uint, ProcessEntry>();
       IntPtr snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);

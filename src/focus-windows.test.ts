@@ -37,6 +37,9 @@ describe("decideWindowsFocus", () => {
       unowned([shell]), false],
     ["no console and no host",
       { foreground: TERMINAL, attached: false, consoleWindow: 0, consoleOwner: 0, consoleVisible: false, ancestors: [] }, false],
+    ["attach failed with a single-window ancestor in front",
+      { foreground: TERMINAL, attached: false, consoleWindow: 0, consoleOwner: 0, consoleVisible: false,
+        ancestors: [{ pid: 20, name: "launcher.exe", windows: [TERMINAL] }] }, false],
     ["no foreground window",
       { foreground: 0, attached: true, consoleWindow: 0, consoleOwner: 0, consoleVisible: false, ancestors: [] }, false],
   ]
