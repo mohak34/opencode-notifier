@@ -304,6 +304,22 @@ describe("Config", () => {
     expect(config.suppressWhenFocused).toBe(false)
   })
 
+  test("loadConfig keeps known channels from a suppressWhenFocused list", async () => {
+    writeFileSync(testConfigPath, JSON.stringify({ suppressWhenFocused: ["notification", "popup", "bell", 1] }))
+
+    const { loadConfig } = await import("./config")
+
+    expect(loadConfig().suppressWhenFocused).toEqual(["notification", "bell"])
+  })
+
+  test("loadConfig defaults an invalid suppressWhenFocused to true", async () => {
+    writeFileSync(testConfigPath, JSON.stringify({ suppressWhenFocused: "sound" }))
+
+    const { loadConfig } = await import("./config")
+
+    expect(loadConfig().suppressWhenFocused).toBe(true)
+  })
+
   test("loadConfig defaults minDuration to 0", async () => {
     const { loadConfig } = await import("./config")
     const config = loadConfig()

@@ -197,7 +197,7 @@ Create `~/.config/opencode/opencode-notifier.json` with this example configurati
 - `showSessionTitle` - Include the session title in notification messages via `{sessionTitle}` placeholder (default: false)
 - `showIcon` - Show OpenCode icon with Windows/Linux notifications and macOS `node-notifier` (default: true). AppleScript uses the Script Editor icon
 - `customIconPath` - Path to a custom icon for notifications. Useful on WSL where Windows paths are needed (default: null)
-- `suppressWhenFocused` - Skip popups, sounds, bells, and V1 event commands when the terminal is focused (default: true). V2 server commands are unaffected. See [Focus detection](#focus-detection) for platform details
+- `suppressWhenFocused` - Skip popups, sounds, bells, and V1 event commands when the terminal is focused (default: true). A list such as `["notification"]` skips only those channels: `"sound"`, `"notification"`, `"bell"`, `"command"`. V2 server commands are unaffected. See [Focus detection](#focus-detection) for platform details
 - `enableOnDesktop` - V1 only: run the plugin on Desktop and Web clients (default: false). V2 runs commands on the server and local alerts in its terminal component; this flag does not control V2 delivery.
 - `notificationSystem` - On macOS, select `"osascript"` or `"node-notifier"` (default: "osascript"). Select `"ghostty"` on any platform running Ghostty for native OSC 9 notifications
 - `suppressGhosttySound` - macOS only: when `true` with `notificationSystem: "ghostty"`, skips the plugin's sound to avoid duplicating macOS Notification Center's default sound (default: false)
@@ -465,6 +465,16 @@ To disable this and always get notified:
   "suppressWhenFocused": false
 }
 ```
+
+To skip only some channels while focused, list them. This keeps sounds but hides popups:
+
+```json
+{
+  "suppressWhenFocused": ["notification"]
+}
+```
+
+Valid entries are `"sound"`, `"notification"`, `"bell"`, and `"command"`. Unknown entries are ignored. An empty list behaves like `false`. `"command"` applies to V1 event commands only.
 
 ## Minimum duration threshold
 
