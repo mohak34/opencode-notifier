@@ -307,6 +307,7 @@ Platform notes:
 - Linux: Format support depends on the player. For MP3, use a capable player such as `mpv` or `ffplay`; `aplay` does not decode MP3
 - Windows: Only .wav files work
 - If file doesn't exist, falls back to bundled sound
+- Keep custom sounds outside OpenCode's cache (`~/.cache/opencode`). The cache path changes between plugin versions and between OpenCode 1 and 2, so a path into it stops working after an update
 
 ### Volumes
 
@@ -708,6 +709,13 @@ Manual pinning bypasses heuristic window matching and should activate that exact
 - Use full Windows paths: `C:/Users/YourName/sounds/alert.wav` (not `~/`)
 - Make sure the file actually plays in Windows Media Player
 - WSL uses Linux sound players, so use a Linux-accessible path such as `/mnt/c/Users/YourName/sounds/alert.wav`
+- Do not point at files inside `~/.cache/opencode`; copy them somewhere stable
+
+**Windows: Sound plays but no popup?**
+
+- Turn off Do Not Disturb (Focus Assist). While it is on, Windows sends toasts straight to the notification center without showing a banner
+- Third-party popup blockers, such as Huorong, can swallow toasts the same way
+- The plugin cannot detect either case: the toast tool reports success even when no banner appeared
 
 **Windows WSL notifications not working?**
 The plugin sends WSL notifications through WindowsToaster. Check the Windows notification settings and icon path first. If toast delivery still fails, a PowerShell popup is an optional fallback.
@@ -776,6 +784,10 @@ If native notification delivery crashes OpenCode, disable native notifications a
 - Check `suppressWhenFocused`: when `true` (default), notifications are skipped while OpenCode terminal is focused. Set to `false` to always notify.
 - On V1, check `enableOnDesktop`: it defaults to `false`. On V2, Desktop/Web and headless clients use server commands; local sounds and popups require the terminal component described above.
 - Follow the version-specific checks under [Updating](#updating). V1 and V2 use different cache layouts.
+
+**`OPENCODE_NOTIFIER_DEBUG=1` prints nothing?**
+
+Debug lines go to stderr. On V2 the full-screen terminal UI hides them, and they are not written to OpenCode's log file. On V2, check behavior directly: put another window in front, trigger an event, and see whether the alert arrives.
 
 ## TypeScript imports
 

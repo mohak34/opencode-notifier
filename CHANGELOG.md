@@ -13,6 +13,10 @@ All notable changes to this project will be documented in this file.
 - Windows focus suppression applies only when the window hosting OpenCode is in front, instead of whenever any terminal or editor is. Another terminal window, File Explorer, or an unrelated VS Code window no longer silences alerts. Uncertain cases deliver the alert, and `OPENCODE_NOTIFIER_DEBUG=1` logs each Windows decision (#130).
 - A sound volume of `0` skips playback on every platform without blocking the next audible sound (#130).
 
+### Documentation
+
+- Windows troubleshooting for toasts hidden by Do Not Disturb or popup blockers, a note to keep custom sounds outside OpenCode's cache, and a note that debug output is not visible in the OpenCode 2 terminal UI (issue #130).
+
 ### Upgrade notes
 
 - `true` and `false` work as before.
