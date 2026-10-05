@@ -1,5 +1,6 @@
 import type { Plugin } from "@opencode/plugin"
 import type { LocationRef, OpenCodeEvent } from "@opencode/client"
+import { debugFocusState as debug } from "./focus"
 import { createNotifier } from "./notifier"
 import type { Delivery } from "./notifier"
 
@@ -52,11 +53,16 @@ export function createV2Notifier(client: Client, location: LocationRef, delivery
       result = client.session.get({ sessionID }).then(
         session => !session.location || here(session.location),
         () => {
+          debug(`v2 session ${sessionID}: lookup failed, delivering`)
           owned.delete(sessionID)
           return true
         },
       )
       owned.set(sessionID, result)
+      if (owned.size > 2048) {
+        const oldest = owned.keys().next().value
+        if (oldest !== undefined) owned.delete(oldest)
+      }
     }
     return result
   }
@@ -78,10 +84,17 @@ export function createV2Notifier(client: Client, location: LocationRef, delivery
       try {
         if (disposed) return
         const sessionID = event.type === "form.created" ? event.data.form.sessionID : "sessionID" in event.data ? event.data.sessionID : undefined
-        if (sessionID && event.type === "session.moved") owned.delete(sessionID)
-        if (event.location) {
-          if (!here(event.location)) return
-        } else if (sessionID && !(await ours(sessionID))) return
+        const cached = sessionID ? owned.get(sessionID) : undefined
+        if (sessionID && (event.type === "session.moved" || event.type === "session.deleted")) owned.delete(sessionID)
+        // A deleted session can no longer be looked up, so only a cached answer can drop it.
+        const mine = event.location ? here(event.location)
+          : !sessionID ? true
+          : event.type === "session.deleted" ? !cached || await cached
+          : await ours(sessionID)
+        if (!mine) {
+          debug(`v2 ${event.type}: session ${sessionID ?? "none"} belongs to another location, skipping`)
+          return
+        }
         switch (event.type) {
           case "session.created":
             if (first(`created:${event.data.sessionID}`)) {
@@ -106,7 +119,6 @@ export function createV2Notifier(client: Client, location: LocationRef, delivery
             }
             break
           case "session.deleted":
-            owned.delete(event.data.sessionID)
             await notifier.stopped(event.data.sessionID)
             break
           case "permission.asked":

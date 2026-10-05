@@ -29,6 +29,7 @@ async function exercise(events: OpenCodeEvent[], options: {
   messageAge?: number
   agentName?: string
   sessionLocation?: { directory: string; workspaceID?: string }
+  onGet?: () => void
 } = {}) {
   writeFileSync(configPath, JSON.stringify({
     suppressWhenFocused: false, sound: false, bell: false, notificationSystem: "ghostty",
@@ -50,6 +51,7 @@ async function exercise(events: OpenCodeEvent[], options: {
   const notifier = createV2Notifier({
     session: {
       get: async () => {
+        options.onGet?.()
         if (options.missing) throw new Error("Session not found")
         return { id: "session", title: "test", location: options.sessionLocation, ...(options.child ? { parentID: "parent", agent: options.agentName } : {}) }
       },
@@ -143,6 +145,16 @@ test("location-less events from another project's session do not notify", async 
 test("location-less events from this project's session notify", async () => {
   const finished = event("session.execution.succeeded", { sessionID: "own" })
   expect((await exercise([finished], { sessionLocation: { directory: fixture } })).length).toBe(1)
+})
+
+test("deleting a foreign session drops its cached ownership", async () => {
+  let lookups = 0
+  const renamed = () => event("session.renamed", { sessionID: "foreign", title: "x" })
+  await exercise([renamed(), event("session.deleted", { sessionID: "foreign" }), renamed()], {
+    sessionLocation: { directory: "/other-project" },
+    onGet: () => lookups++,
+  })
+  expect(lookups).toBe(2)
 })
 
 test("a failed session lookup fails open", async () => {
