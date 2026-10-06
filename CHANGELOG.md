@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.8.0-beta.1] - 2026-10-06
+## [0.8.0] - 2026-10-06
 
 ### Added
 
@@ -24,6 +24,11 @@ All notable changes to this project will be documented in this file.
 ### Upgrade notes
 
 - `suppressWhenFocused: true` and `false` work as before.
+- `0.8.0` and `0.8.0-beta.1` contain the same implementation and differ only in the package version.
+
+## [0.8.0-beta.1] - 2026-10-06
+
+Same implementation as v0.8.0, with the prerelease package version for npm's `beta` dist-tag.
 
 ## [0.7.0] - 2026-10-03
 
