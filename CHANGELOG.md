@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.0-beta.1] - 2026-10-06
+
 ### Added
 
 - `suppressWhenFocused` accepts a list of channels, so `["notification"]` hides popups while the terminal is focused but still plays sounds (issue #135).
@@ -21,7 +23,7 @@ All notable changes to this project will be documented in this file.
 
 ### Upgrade notes
 
-- `true` and `false` work as before.
+- `suppressWhenFocused: true` and `false` work as before.
 
 ## [0.7.0] - 2026-10-03
 
