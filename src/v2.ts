@@ -98,22 +98,22 @@ export function createV2Notifier(client: Client, location: LocationRef, delivery
         switch (event.type) {
           case "session.created":
             if (first(`created:${event.data.sessionID}`)) {
-              await notifier.created(event.data.sessionID, event.data.parentID ?? null, event.data.title ?? null)
+              await notifier.created(event.data.sessionID, event.data.parentID ?? null, event.data.title ?? null, `created:${event.data.sessionID}`)
             }
             break
           case "session.execution.started":
             notifier.busy(event.data.sessionID)
             break
           case "session.execution.succeeded":
-            if (first(`complete:${event.id}`)) await notifier.idle(event.data.sessionID)
+            if (first(`complete:${event.id}`)) await notifier.idle(event.data.sessionID, true, `complete:${event.id}`)
             break
           case "session.execution.failed":
-            if (first(`failed:${event.id}`)) await notifier.failed(event.data.sessionID, "error")
+            if (first(`failed:${event.id}`)) await notifier.failed(event.data.sessionID, "error", `failed:${event.id}`)
             break
           case "session.execution.interrupted":
             // Shutdown, supersession and inactivity are not user cancellations or failures.
             if (event.data.reason === "user" && first(`cancelled:${event.id}`)) {
-              await notifier.failed(event.data.sessionID, "user_cancelled")
+              await notifier.failed(event.data.sessionID, "user_cancelled", `cancelled:${event.id}`)
             } else if (event.data.reason !== "user" && first(`stopped:${event.id}`)) {
               await notifier.stopped(event.data.sessionID)
             }
@@ -122,16 +122,16 @@ export function createV2Notifier(client: Client, location: LocationRef, delivery
             await notifier.stopped(event.data.sessionID)
             break
           case "permission.asked":
-            if (first(`permission:${event.data.id}`)) await notifier.permission(event.data.sessionID, event.data.id)
+            if (first(`permission:${event.data.id}`)) await notifier.permission(event.data.sessionID, event.data.id, false, `permission:${event.data.id}`)
             break
           case "session.inbox.enqueued":
             if (event.data.item.type === "user" && first(`message:${event.data.inboxID}`)) {
-              await notifier.userMessage(event.data.sessionID, true)
+              await notifier.userMessage(event.data.sessionID, true, `message:${event.data.inboxID}`)
             }
             break
           case "form.created":
             if (event.data.form.metadata?.kind === "question" && first(`form:${event.data.form.id}`)) {
-              await notifier.notify("question", event.data.form.sessionID)
+              await notifier.notify("question", event.data.form.sessionID, { key: `form:${event.data.form.id}` })
             }
             break
           // V2 has no plan_exit tool; changing agents is not a plan-ready signal.

@@ -1,6 +1,7 @@
 import { basename } from "path"
 import { loadConfig } from "./config"
 import type { EventType, NotifierConfig } from "./config"
+import { claimDelivery } from "./claim"
 import { extractAgentNameFromSessionTitle, handleEvent, shouldResolveSessionContextForEvent } from "./delivery"
 import { shouldSuppressPermissionAlert, prunePermissionAlertState } from "./permission-dedupe"
 
@@ -23,6 +24,13 @@ export interface SessionAccess {
 
 export type Delivery = "all" | "terminal" | "command"
 
+// key identifies the host event behind an alert. Terminals on one machine share it, so only one delivers.
+interface NotifyOptions {
+  title?: string | null
+  now?: number
+  key?: string
+}
+
 // Each host instance owns its timers and session state. The adapters only translate API data.
 export function createNotifier(access: SessionAccess, directory: string, delivery: Delivery = "all") {
   const children = new Set<string>()
@@ -32,7 +40,7 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
   const idleTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const parents = new Map<string, string>()
   const running = new Set<string>()
-  const pending = new Map<string, { sequence: number; title: string | null; timer: ReturnType<typeof setTimeout> }>()
+  const pending = new Map<string, { sequence: number; title: string | null; key?: string; timer: ReturnType<typeof setTimeout> }>()
   let disposed = false
 
   function config(): NotifierConfig {
@@ -64,7 +72,7 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
     return sequence
   }
 
-  async function notify(event: EventType, sessionID: string | null = null, title?: string | null, now = Date.now()) {
+  async function notify(event: EventType, sessionID: string | null = null, { title, now = Date.now(), key }: NotifyOptions = {}) {
     if (disposed) return
     const current = config()
     // Do not count a server event that has no command to deliver.
@@ -82,6 +90,7 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
       agentName = info.agentName ?? null
     }
     if (disposed) return
+    if (key && delivery === "terminal" && !claimDelivery(`${directory}\0${key}`)) return
     const project = directory ? (current.showFullPath ? directory : basename(directory)) : null
     await handleEvent(current, event, project, elapsed, sessionTitle, sessionID, agentName ?? extractAgentNameFromSessionTitle(sessionTitle))
   }
@@ -113,16 +122,16 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
       pending.delete(id)
       clearTimeout(deferred.timer)
       if (!disposed && sequences.get(id) === deferred.sequence) {
-        await notify("complete", id, deferred.title)
+        await notify("complete", id, { title: deferred.title, key: deferred.key })
       }
     }
   }
 
-  async function complete(sessionID: string, sequence: number, now: number) {
+  async function complete(sessionID: string, sequence: number, now: number, key?: string) {
     if (disposed || sequences.get(sessionID) !== sequence) return
     if (errors.delete(sessionID)) return
     if (children.has(sessionID)) {
-      await notify("subagent_complete", sessionID, null, now)
+      await notify("subagent_complete", sessionID, { now, key })
       return
     }
     const info = await access.info(sessionID)
@@ -134,10 +143,10 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
       // Expiry drops the pending alert; it must not claim completion while work is still active.
       const timer = setTimeout(() => pending.delete(sessionID), current.deferredCompleteTimeout)
       timer.unref()
-      pending.set(sessionID, { sequence, title: info.title, timer })
+      pending.set(sessionID, { sequence, title: info.title, key, timer })
       return
     }
-    await notify(info.isChild ? "subagent_complete" : "complete", sessionID, info.title, now)
+    await notify(info.isChild ? "subagent_complete" : "complete", sessionID, { title: info.title, now, key })
   }
 
   // Bound tombstones and run state without discarding a live lookup or pending idle.
@@ -158,30 +167,30 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
   return {
     notify,
     track,
-    async created(id: string | null, parentID: string | null, title: string | null) {
+    async created(id: string | null, parentID: string | null, title: string | null, key?: string) {
       if (id) track(id, parentID)
       if (id && parentID) running.add(id)
-      if (!parentID) await notify("session_started", id, title)
+      if (!parentID) await notify("session_started", id, { title, key })
     },
     busy(id: string) {
       invalidate(id)
       errors.delete(id)
       running.add(id)
     },
-    async idle(id: string | null, immediate = true) {
+    async idle(id: string | null, immediate = true, key?: string) {
       if (disposed) return
       if (!id) return notify("complete")
       const sequence = invalidate(id)
       running.delete(id)
       const now = Date.now()
       if (immediate) {
-        await complete(id, sequence, now)
+        await complete(id, sequence, now, key)
         await flushPending()
         return
       }
       idleTimers.set(id, setTimeout(() => {
         idleTimers.delete(id)
-        void complete(id, sequence, now).then(flushPending).catch(() => undefined)
+        void complete(id, sequence, now, key).then(flushPending).catch(() => undefined)
       }, IDLE_COMPLETE_DELAY_MS))
     },
     async stopped(id: string) {
@@ -189,16 +198,16 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
       running.delete(id)
       await flushPending()
     },
-    async failed(id: string | null, event: "error" | "user_cancelled") {
+    async failed(id: string | null, event: "error" | "user_cancelled", key?: string) {
       if (id) {
         invalidate(id)
         errors.add(id)
         running.delete(id)
       }
-      await notify(event, id)
+      await notify(event, id, { key })
       await flushPending()
     },
-    async permission(id: string | null, requestID: string | null, legacyHook = false) {
+    async permission(id: string | null, requestID: string | null, legacyHook = false, key?: string) {
       if (requestID) {
         await new Promise(resolve => setTimeout(resolve, PERMISSION_PENDING_GRACE_MS))
         if (disposed || !(await access.permissionPending(id, requestID))) return
@@ -206,15 +215,15 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
       if (disposed) return
       // V1 has two permission sources. V2 adapters dedupe by request identity.
       if (legacyHook && shouldSuppressPermissionAlert(id)) return
-      await notify("permission", id)
+      await notify("permission", id, { key })
     },
-    async userMessage(id: string | null, verifyParent = false) {
+    async userMessage(id: string | null, verifyParent = false, key?: string) {
       if (id && children.has(id)) return
       if (id && verifyParent) {
         const info = await access.info(id)
         if (info.isChild !== false) return
       }
-      await notify("user_message", id)
+      await notify("user_message", id, { key })
     },
     dispose() {
       disposed = true
