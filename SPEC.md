@@ -14,6 +14,8 @@ One package serves two hosts. Users add the same package name; nothing selects a
 | Event commands | server plugin, subject to focus suppression | server, once per event, even with no terminal open, not subject to focus |
 | Click commands | server plugin | terminal component |
 
+On V2 one server can feed several clients. Each client and the server plugin handle only events for sessions in their own directory and workspace, taken from the event's location or, when it has none, from the session. If the session lookup fails, the event is delivered.
+
 ## Events
 
 | Event | Fires when | Default channels |

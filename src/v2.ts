@@ -1,5 +1,6 @@
 import type { Plugin } from "@opencode/plugin"
 import type { LocationRef, OpenCodeEvent } from "@opencode/client"
+import { debugFocusState as debug } from "./focus"
 import { createNotifier } from "./notifier"
 import type { Delivery } from "./notifier"
 
@@ -37,7 +38,34 @@ export function createV2Notifier(client: Client, location: LocationRef, delivery
     },
   }, location.directory, delivery)
   const seen = new Set<string>()
+  const owned = new Map<string, Promise<boolean>>()
   let disposed = false
+
+  function here(other: { directory: string; workspaceID?: string }) {
+    return other.directory === location.directory && other.workspaceID === location.workspaceID
+  }
+
+  // Some V2 events carry only a sessionID, so ownership comes from the session itself.
+  // Lookup failures fail open and are retried on the next event.
+  function ours(sessionID: string) {
+    let result = owned.get(sessionID)
+    if (!result) {
+      result = client.session.get({ sessionID }).then(
+        session => !session.location || here(session.location),
+        () => {
+          debug(`v2 session ${sessionID}: lookup failed, delivering`)
+          owned.delete(sessionID)
+          return true
+        },
+      )
+      owned.set(sessionID, result)
+      if (owned.size > 2048) {
+        const oldest = owned.keys().next().value
+        if (oldest !== undefined) owned.delete(oldest)
+      }
+    }
+    return result
+  }
 
   function first(key: string) {
     if (seen.has(key)) return false
@@ -55,9 +83,17 @@ export function createV2Notifier(client: Client, location: LocationRef, delivery
     async event(event: OpenCodeEvent) {
       try {
         if (disposed) return
-        if (event.location) {
-          const workspaceID = "workspaceID" in event.location ? event.location.workspaceID : undefined
-          if (event.location.directory !== location.directory || workspaceID !== location.workspaceID) return
+        const sessionID = event.type === "form.created" ? event.data.form.sessionID : "sessionID" in event.data ? event.data.sessionID : undefined
+        const cached = sessionID ? owned.get(sessionID) : undefined
+        if (sessionID && (event.type === "session.moved" || event.type === "session.deleted")) owned.delete(sessionID)
+        // A deleted session can no longer be looked up, so only a cached answer can drop it.
+        const mine = event.location ? here(event.location)
+          : !sessionID ? true
+          : event.type === "session.deleted" ? !cached || await cached
+          : await ours(sessionID)
+        if (!mine) {
+          debug(`v2 ${event.type}: session ${sessionID ?? "none"} belongs to another location, skipping`)
+          return
         }
         switch (event.type) {
           case "session.created":
@@ -108,6 +144,7 @@ export function createV2Notifier(client: Client, location: LocationRef, delivery
       disposed = true
       notifier.dispose()
       seen.clear()
+      owned.clear()
     },
   }
 }
