@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Windows focus suppression applies only when the window hosting OpenCode is in front, instead of whenever any terminal or editor is. Another terminal window, File Explorer, or an unrelated VS Code window no longer silences alerts. Uncertain cases deliver the alert, and `OPENCODE_NOTIFIER_DEBUG=1` logs each Windows decision (#130).
 - A sound volume of `0` skips playback on every platform without blocking the next audible sound (#130).
 - OpenCode 2: when several clients share one server, a finished session alerts only the client in that session's project, instead of every client under its own project name (issue #132).
+- OpenCode 2: several terminals on one computer showing the same session alert once per event instead of once per terminal. Terminals on different computers still each alert (issue #138).
 
 ### Documentation
 

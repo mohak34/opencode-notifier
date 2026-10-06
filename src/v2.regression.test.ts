@@ -11,7 +11,14 @@ const configPath = join(fixture, "config.json")
 const commandLog = join(fixture, "commands.txt")
 const commandScript = join(fixture, "record-command.mjs")
 writeFileSync(commandScript, 'import { appendFileSync } from "node:fs"; appendFileSync(process.argv[2], process.argv[3]+"\\n")')
-afterAll(() => rmSync(fixture, { recursive: true, force: true }))
+// Delivery claims are machine-wide marker files under the temp directory; keep them in the fixture.
+const oldTmpdir = process.env.TMPDIR
+process.env.TMPDIR = fixture
+afterAll(() => {
+  if (oldTmpdir === undefined) delete process.env.TMPDIR
+  else process.env.TMPDIR = oldTmpdir
+  rmSync(fixture, { recursive: true, force: true })
+})
 let eventID = 0
 
 function event(type: string, data: object): OpenCodeEvent {
@@ -99,6 +106,13 @@ test("deleted and unknown children never become top-level completion", async () 
 test("v2 execution success produces one completion, even on replay", async () => {
   const finished = event("session.execution.succeeded", { sessionID: "success" })
   expect((await exercise([event("session.execution.started", { sessionID: "success" }), finished, finished])).length).toBe(1)
+})
+
+test("terminals on one machine alert once for an event they both receive", async () => {
+  const finished = event("session.execution.succeeded", { sessionID: "shared" })
+  expect((await exercise([finished])).length).toBe(1)
+  expect((await exercise([finished])).length).toBe(0)
+  expect((await exercise([event("session.execution.succeeded", { sessionID: "shared" })])).length).toBe(1)
 })
 
 test("a new run clears error suppression", async () => {

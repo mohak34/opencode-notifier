@@ -41,8 +41,9 @@ An event is delivered on a channel only if every check passes, in this order:
 2. `complete` and `subagent_complete`: the session ran longer than `minDuration`.
 3. `complete` with `deferCompleteUntilChildrenIdle`: wait for tracked child sessions, at most `deferredCompleteTimeout`. A new parent run cancels the wait; an expired wait drops the alert.
 4. `permission`: the request is still pending after a 300 ms grace (auto-approved requests stay silent), and the same request has not already alerted.
-5. Focus: with `suppressWhenFocused`, skip when the OpenCode terminal (and its pane, under tmux, WezTerm or Zellij) is in front. `true` skips every channel; a list of channels skips only those. Unknown focus means not focused.
-6. Sound: at most one sound per second across all events.
+5. OpenCode 2 terminals: when several on one machine receive the same event, only the first to claim it delivers. The claim is a marker file in the user's temp directory; if it cannot be written, every terminal delivers.
+6. Focus: with `suppressWhenFocused`, skip when the OpenCode terminal (and its pane, under tmux, WezTerm or Zellij) is in front. `true` skips every channel; a list of channels skips only those. Unknown focus means not focused.
+7. Sound: at most one sound per second across all events.
 
 ## Guarantees
 
