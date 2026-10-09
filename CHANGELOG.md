@@ -4,9 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.1-beta.0] - 2026-10-09
+
 ### Fixed
 
-- With `deferCompleteUntilChildrenIdle`, a parent that OpenCode resumes after its child sessions finish, for example to start another wave of children or write its final answer, alerts once after its final turn instead of once per wave (issue #87).
+- With `deferCompleteUntilChildrenIdle`, a parent that OpenCode resumes after its child sessions finish, for example to start another wave of children or write its final answer, alerts once after its final turn instead of once per wave (#140; issue #87).
 
 ### Upgrade notes
 
