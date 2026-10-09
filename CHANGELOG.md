@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### Upgrade notes
 
-- Nothing changes unless `deferCompleteUntilChildrenIdle` is on. When it is, a parent that does not resume alerts 2 seconds after its last child stops instead of immediately.
+- Nothing changes unless `deferCompleteUntilChildrenIdle` is on; when it is, a parent that does not resume alerts 2 seconds after its last child stops instead of immediately.
 
 ## [0.8.0] - 2026-10-06
 

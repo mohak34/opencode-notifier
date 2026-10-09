@@ -169,3 +169,63 @@ test("expired completion is dropped even if a child later finishes or grace is r
   await advance(CHILDREN_SETTLE_MS)
   expect(writes).toHaveLength(0)
 })
+
+// A notifier whose minDuration lookup for the parent waits until the test releases it.
+function withSlowElapsed() {
+  writeFileSync(configPath, JSON.stringify({ ...config, minDuration: 1 }))
+  const releases: (() => void)[] = []
+  notifier.dispose()
+  notifier = createNotifier({
+    info: async id => ({ isChild: id.startsWith("child"), title: id }),
+    elapsed: async id => id === "parent" ? new Promise(resolve => releases.push(() => resolve(null))) : null,
+    permissionPending: async () => true,
+  }, directory)
+  return async () => {
+    for (const release of releases.splice(0)) release()
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+  }
+}
+
+test("a child that starts while grace delivery looks up metadata cancels it", async () => {
+  jest.useFakeTimers()
+  const release = withSlowElapsed()
+  await notifier.created("child1", "parent", null)
+  await notifier.idle("parent")
+  await notifier.idle("child1")
+  await advance(CHILDREN_SETTLE_MS)
+  notifier.busy("child1")
+  await release()
+  expect(parentDone()).toBe(0)
+  await notifier.idle("child1")
+  await advance(CHILDREN_SETTLE_MS)
+  await release()
+  expect(parentDone()).toBe(1)
+})
+
+test("a repeated parent idle during grace keeps the wait", async () => {
+  jest.useFakeTimers()
+  await notifier.created("child1", "parent", null)
+  await notifier.idle("parent")
+  await notifier.idle("child1")
+  await advance(CHILDREN_SETTLE_MS / 2)
+  await notifier.idle("parent")
+  expect(parentDone()).toBe(0)
+  await advance(CHILDREN_SETTLE_MS / 2)
+  expect(parentDone()).toBe(1)
+  notifier.busy("parent")
+  await notifier.idle("parent")
+  expect(parentDone()).toBe(2)
+})
+
+test("expiry during grace delivery lookups drops the alert", async () => {
+  jest.useFakeTimers()
+  const release = withSlowElapsed()
+  writeFileSync(configPath, JSON.stringify({ ...config, minDuration: 1, deferredCompleteTimeout: CHILDREN_SETTLE_MS + 100 }))
+  await notifier.created("child1", "parent", null)
+  await notifier.idle("parent")
+  await notifier.idle("child1")
+  await advance(CHILDREN_SETTLE_MS)
+  await advance(100)
+  await release()
+  expect(parentDone()).toBe(0)
+})

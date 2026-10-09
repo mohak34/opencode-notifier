@@ -8,9 +8,8 @@ import { shouldSuppressPermissionAlert, prunePermissionAlertState } from "./perm
 // Allow immediate auto-approval to settle before checking the pending list.
 export const PERMISSION_PENDING_GRACE_MS = 300
 const IDLE_COMPLETE_DELAY_MS = 350
-// OpenCode resumes a parent with its children's results right after the last one stops. The V1 idle
-// debounce alone is 350 ms, so 2 s leaves room for the parent's busy event while still alerting soon
-// for a parent that never resumes.
+// OpenCode resumes a parent with its children's results right after the last one stops. 2 s leaves
+// room for the parent's busy event while still alerting soon for a parent that never resumes.
 export const CHILDREN_SETTLE_MS = 2000
 
 export interface SessionInfo {
@@ -33,7 +32,7 @@ interface NotifyOptions {
   title?: string | null
   now?: number
   key?: string
-  // Rechecked after lookups, right before delivery.
+  // Called after lookups, right before delivery. False skips the alert.
   valid?: () => boolean
 }
 
@@ -46,7 +45,8 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
   const idleTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const parents = new Map<string, string>()
   const running = new Set<string>()
-  // timer drops the alert at deferredCompleteTimeout; grace runs while no descendant is running.
+  // timer drops the alert at deferredCompleteTimeout; grace runs while no descendant is running. The
+  // entry stays until delivery, so dropping it or clearing grace cancels an alert already in flight.
   const pending = new Map<string, {
     title: string | null
     key?: string
@@ -118,6 +118,8 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
     if (parentID) {
       children.add(sessionID)
       parents.set(sessionID, parentID)
+      // A session can be running before its parent is known.
+      holdGrace()
     }
   }
 
@@ -139,14 +141,13 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
   function startGrace() {
     for (const [id, deferred] of pending) {
       if (deferred.grace || hasRunningChildren(id)) continue
-      const sequence = sequences.get(id)
       const grace = setTimeout(() => {
-        if (pending.get(id) !== deferred || deferred.grace !== grace) return
-        deferred.grace = undefined
-        if (hasRunningChildren(id)) return
-        drop(id)
-        void notify("complete", id, { title: deferred.title, key: deferred.key, valid: () => sequences.get(id) === sequence })
-          .catch(() => undefined)
+        const valid = () => {
+          if (pending.get(id) !== deferred || deferred.grace !== grace) return false
+          drop(id)
+          return true
+        }
+        void notify("complete", id, { title: deferred.title, key: deferred.key, valid }).catch(() => undefined)
       }, CHILDREN_SETTLE_MS)
       grace.unref()
       deferred.grace = grace
@@ -219,6 +220,8 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
     async idle(id: string | null, immediate = true, key?: string) {
       if (disposed) return
       if (!id) return notify("complete")
+      // Its busy would have dropped the alert, so this is a repeated idle. Keep the current wait.
+      if (pending.has(id)) return
       const sequence = invalidate(id)
       running.delete(id)
       const now = Date.now()
