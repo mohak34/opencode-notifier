@@ -8,6 +8,10 @@ import { shouldSuppressPermissionAlert, prunePermissionAlertState } from "./perm
 // Allow immediate auto-approval to settle before checking the pending list.
 export const PERMISSION_PENDING_GRACE_MS = 300
 const IDLE_COMPLETE_DELAY_MS = 350
+// OpenCode resumes a parent with its children's results right after the last one stops. The V1 idle
+// debounce alone is 350 ms, so 2 s leaves room for the parent's busy event while still alerting soon
+// for a parent that never resumes.
+export const CHILDREN_SETTLE_MS = 2000
 
 export interface SessionInfo {
   // A failed lookup must never turn a deleted child into a parent.
@@ -29,6 +33,8 @@ interface NotifyOptions {
   title?: string | null
   now?: number
   key?: string
+  // Rechecked after lookups, right before delivery.
+  valid?: () => boolean
 }
 
 // Each host instance owns its timers and session state. The adapters only translate API data.
@@ -40,7 +46,13 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
   const idleTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const parents = new Map<string, string>()
   const running = new Set<string>()
-  const pending = new Map<string, { sequence: number; title: string | null; key?: string; timer: ReturnType<typeof setTimeout> }>()
+  // timer drops the alert at deferredCompleteTimeout; grace runs while no descendant is running.
+  const pending = new Map<string, {
+    title: string | null
+    key?: string
+    timer: ReturnType<typeof setTimeout>
+    grace?: ReturnType<typeof setTimeout>
+  }>()
   let disposed = false
 
   function config(): NotifierConfig {
@@ -66,13 +78,19 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
     sequences.set(sessionID, sequence)
     clearTimeout(idleTimers.get(sessionID))
     idleTimers.delete(sessionID)
-    const deferred = pending.get(sessionID)
-    if (deferred) clearTimeout(deferred.timer)
-    pending.delete(sessionID)
+    drop(sessionID)
     return sequence
   }
 
-  async function notify(event: EventType, sessionID: string | null = null, { title, now = Date.now(), key }: NotifyOptions = {}) {
+  function drop(sessionID: string) {
+    const deferred = pending.get(sessionID)
+    if (!deferred) return
+    clearTimeout(deferred.timer)
+    clearTimeout(deferred.grace)
+    pending.delete(sessionID)
+  }
+
+  async function notify(event: EventType, sessionID: string | null = null, { title, now = Date.now(), key, valid }: NotifyOptions = {}) {
     if (disposed) return
     const current = config()
     // Do not count a server event that has no command to deliver.
@@ -89,7 +107,7 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
       sessionTitle ??= info.title
       agentName = info.agentName ?? null
     }
-    if (disposed) return
+    if (disposed || (valid && !valid())) return
     if (key && delivery === "terminal" && !claimDelivery(`${directory}\0${key}`)) return
     const project = directory ? (current.showFullPath ? directory : basename(directory)) : null
     await handleEvent(current, event, project, elapsed, sessionTitle, sessionID, agentName ?? extractAgentNameFromSessionTitle(sessionTitle))
@@ -116,14 +134,31 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
     return false
   }
 
-  async function flushPending(): Promise<void> {
+  // A parent whose descendants all stopped alerts after a grace, unless it resumes first. Its next
+  // busy drops the alert and its next idle decides again.
+  function startGrace() {
     for (const [id, deferred] of pending) {
-      if (hasRunningChildren(id)) continue
-      pending.delete(id)
-      clearTimeout(deferred.timer)
-      if (!disposed && sequences.get(id) === deferred.sequence) {
-        await notify("complete", id, { title: deferred.title, key: deferred.key })
-      }
+      if (deferred.grace || hasRunningChildren(id)) continue
+      const sequence = sequences.get(id)
+      const grace = setTimeout(() => {
+        if (pending.get(id) !== deferred || deferred.grace !== grace) return
+        deferred.grace = undefined
+        if (hasRunningChildren(id)) return
+        drop(id)
+        void notify("complete", id, { title: deferred.title, key: deferred.key, valid: () => sequences.get(id) === sequence })
+          .catch(() => undefined)
+      }, CHILDREN_SETTLE_MS)
+      grace.unref()
+      deferred.grace = grace
+    }
+  }
+
+  // A descendant that starts during grace holds the alert until it stops again.
+  function holdGrace() {
+    for (const [id, deferred] of pending) {
+      if (!deferred.grace || !hasRunningChildren(id)) continue
+      clearTimeout(deferred.grace)
+      deferred.grace = undefined
     }
   }
 
@@ -141,9 +176,9 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
     const current = config()
     if (!info.isChild && current.deferCompleteUntilChildrenIdle && hasRunningChildren(sessionID)) {
       // Expiry drops the pending alert; it must not claim completion while work is still active.
-      const timer = setTimeout(() => pending.delete(sessionID), current.deferredCompleteTimeout)
+      const timer = setTimeout(() => drop(sessionID), current.deferredCompleteTimeout)
       timer.unref()
-      pending.set(sessionID, { sequence, title: info.title, key, timer })
+      pending.set(sessionID, { title: info.title, key, timer })
       return
     }
     await notify(info.isChild ? "subagent_complete" : "complete", sessionID, { title: info.title, now, key })
@@ -169,13 +204,17 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
     track,
     async created(id: string | null, parentID: string | null, title: string | null, key?: string) {
       if (id) track(id, parentID)
-      if (id && parentID) running.add(id)
+      if (id && parentID) {
+        running.add(id)
+        holdGrace()
+      }
       if (!parentID) await notify("session_started", id, { title, key })
     },
     busy(id: string) {
       invalidate(id)
       errors.delete(id)
       running.add(id)
+      holdGrace()
     },
     async idle(id: string | null, immediate = true, key?: string) {
       if (disposed) return
@@ -185,18 +224,18 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
       const now = Date.now()
       if (immediate) {
         await complete(id, sequence, now, key)
-        await flushPending()
+        startGrace()
         return
       }
       idleTimers.set(id, setTimeout(() => {
         idleTimers.delete(id)
-        void complete(id, sequence, now, key).then(flushPending).catch(() => undefined)
+        void complete(id, sequence, now, key).then(startGrace).catch(() => undefined)
       }, IDLE_COMPLETE_DELAY_MS))
     },
-    async stopped(id: string) {
+    stopped(id: string) {
       invalidate(id)
       running.delete(id)
-      await flushPending()
+      startGrace()
     },
     async failed(id: string | null, event: "error" | "user_cancelled", key?: string) {
       if (id) {
@@ -205,7 +244,7 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
         running.delete(id)
       }
       await notify(event, id, { key })
-      await flushPending()
+      startGrace()
     },
     async permission(id: string | null, requestID: string | null, legacyHook = false, key?: string) {
       if (requestID) {
@@ -234,8 +273,7 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
       sequences.clear()
       errors.clear()
       touched.clear()
-      for (const deferred of pending.values()) clearTimeout(deferred.timer)
-      pending.clear()
+      for (const id of [...pending.keys()]) drop(id)
       parents.clear()
       running.clear()
     },
