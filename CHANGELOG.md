@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.8.1-beta.0] - 2026-10-09
+## [0.8.1] - 2026-10-09
 
 ### Fixed
 
@@ -13,6 +13,11 @@ All notable changes to this project will be documented in this file.
 ### Upgrade notes
 
 - Nothing changes unless `deferCompleteUntilChildrenIdle` is on; when it is, a parent that does not resume alerts 2 seconds after its last child stops instead of immediately.
+- `0.8.1` and `0.8.1-beta.0` contain the same implementation and differ only in the package version.
+
+## [0.8.1-beta.0] - 2026-10-09
+
+Same implementation as v0.8.1, with the prerelease package version for npm's `beta` dist-tag.
 
 ## [0.8.0] - 2026-10-06
 
