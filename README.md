@@ -495,7 +495,11 @@ This is independent of `command.minDuration`, which only controls whether the cu
 
 Set `"deferCompleteUntilChildrenIdle": true` to wait for known child sessions before sending the parent's `complete` notification, sound, bell, or command. The default is `false`.
 
-The plugin tracks native OpenCode child sessions and their descendants from creation and execution events. It sends one parent completion after all tracked child work finishes, fails, is interrupted, or is deleted. A new parent run cancels the pending completion. Work from third-party delegation plugins without native child-session events, or work already running before the notifier loads, cannot be tracked reliably.
+The plugin tracks native OpenCode child sessions and their descendants from creation and execution events. When the parent goes idle while children run, its completion waits until all tracked child work finishes, fails, is interrupted, or is deleted.
+
+OpenCode usually resumes the parent with its children's results. The parent may start another wave of children before it writes its final answer. So after the last child stops, the plugin waits 2 more seconds. If the parent resumes in that time, the pending completion is cancelled and the parent's next idle decides again: it alerts if no children are running, or waits again. You get one completion, after the parent's final turn. If the parent does not resume within 2 seconds, the completion is sent then. A parent that resumes later than that produces this early alert and another one when it finishes.
+
+Work from third-party delegation plugins without native child-session events, or work already running before the notifier loads, cannot be tracked reliably.
 
 `deferredCompleteTimeout` limits the wait in milliseconds, default `900000` (15 minutes). Expired pending alerts are dropped rather than reporting completion while work is still running.
 

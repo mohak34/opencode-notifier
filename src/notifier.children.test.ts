@@ -1,8 +1,8 @@
-import { afterAll, afterEach, beforeEach, expect, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, expect, jest, test } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
-import { createNotifier } from "./notifier"
+import { CHILDREN_SETTLE_MS, createNotifier } from "./notifier"
 
 const directory = mkdtempSync(join(tmpdir(), "notifier-children-test-"))
 const configPath = join(directory, "config.json")
@@ -36,6 +36,7 @@ beforeEach(() => {
   }, directory)
 })
 afterEach(() => {
+  jest.useRealTimers()
   notifier.dispose()
   process.stdout.write = previousWrite
   if (previousConfig === undefined) delete process.env.OPENCODE_NOTIFIER_CONFIG_PATH
@@ -43,7 +44,16 @@ afterEach(() => {
 })
 afterAll(() => rmSync(directory, { recursive: true, force: true }))
 
+const parentDone = () => writes.filter(value => value.includes("PARENT_DONE parent")).length
+
+// Fires due timers, then lets the async delivery they started finish.
+async function advance(ms: number) {
+  jest.advanceTimersByTime(ms)
+  for (let i = 0; i < 20; i++) await Promise.resolve()
+}
+
 test("parent completion waits for every active child and emits once", async () => {
+  jest.useFakeTimers()
   await notifier.created("child1", "parent", null)
   await notifier.created("child2", "parent", null)
   notifier.busy("child1")
@@ -53,17 +63,68 @@ test("parent completion waits for every active child and emits once", async () =
   await notifier.idle("child1")
   expect(writes).toHaveLength(0)
   await notifier.idle("child2")
-  expect(writes.filter(value => value.includes("PARENT_DONE parent"))).toHaveLength(1)
   await notifier.idle("child2")
-  expect(writes.filter(value => value.includes("PARENT_DONE parent"))).toHaveLength(1)
+  await advance(CHILDREN_SETTLE_MS - 1)
+  expect(parentDone()).toBe(0)
+  await advance(1)
+  expect(parentDone()).toBe(1)
+  await notifier.idle("child2")
+  await advance(CHILDREN_SETTLE_MS)
+  expect(parentDone()).toBe(1)
+})
+
+test("a parent resumed by its children alerts once, after its final turn", async () => {
+  jest.useFakeTimers()
+  for (const wave of [["child1", "child2"], ["child3"]]) {
+    notifier.busy("parent")
+    for (const child of wave) await notifier.created(child, "parent", null)
+    await notifier.idle("parent")
+    for (const child of wave) await notifier.idle(child)
+    await advance(CHILDREN_SETTLE_MS / 2)
+  }
+  notifier.busy("parent")
+  await advance(CHILDREN_SETTLE_MS)
+  expect(parentDone()).toBe(0)
+  await notifier.idle("parent")
+  expect(parentDone()).toBe(1)
+  await advance(CHILDREN_SETTLE_MS)
+  expect(parentDone()).toBe(1)
+})
+
+test("a child that starts during grace holds the alert until it stops", async () => {
+  jest.useFakeTimers()
+  await notifier.created("child1", "parent", null)
+  await notifier.idle("parent")
+  await notifier.idle("child1")
+  await advance(CHILDREN_SETTLE_MS / 2)
+  notifier.busy("child1")
+  await advance(CHILDREN_SETTLE_MS / 4)
+  await notifier.idle("child1")
+  await advance(CHILDREN_SETTLE_MS - 1)
+  expect(parentDone()).toBe(0)
+  await advance(1)
+  expect(parentDone()).toBe(1)
 })
 
 test("a new parent run cancels its pending completion", async () => {
+  jest.useFakeTimers()
   await notifier.created("child1", "parent", null)
   notifier.busy("child1")
   await notifier.idle("parent")
   notifier.busy("parent")
   await notifier.idle("child1")
+  await advance(CHILDREN_SETTLE_MS)
+  expect(writes).toHaveLength(0)
+})
+
+test("a parent run during grace cancels that grace", async () => {
+  jest.useFakeTimers()
+  await notifier.created("child1", "parent", null)
+  await notifier.idle("parent")
+  await notifier.idle("child1")
+  await advance(CHILDREN_SETTLE_MS / 2)
+  notifier.busy("parent")
+  await advance(CHILDREN_SETTLE_MS)
   expect(writes).toHaveLength(0)
 })
 
@@ -76,28 +137,95 @@ test("existing completion behavior stays unchanged when deferral is disabled", a
 })
 
 test("running grandchildren defer completion until they stop", async () => {
+  jest.useFakeTimers()
   await notifier.created("child1", "parent", null)
   await notifier.created("child2", "child1", null)
   await notifier.idle("child1")
   await notifier.idle("parent")
   expect(writes).toHaveLength(0)
   await notifier.stopped("child2")
-  expect(writes.filter(value => value.includes("PARENT_DONE parent"))).toHaveLength(1)
+  await advance(CHILDREN_SETTLE_MS)
+  expect(parentDone()).toBe(1)
 })
 
 test("a child failure releases the parent completion", async () => {
+  jest.useFakeTimers()
   await notifier.created("child1", "parent", null)
   await notifier.idle("parent")
   expect(writes).toHaveLength(0)
   await notifier.failed("child1", "error")
-  expect(writes.filter(value => value.includes("PARENT_DONE parent"))).toHaveLength(1)
+  await advance(CHILDREN_SETTLE_MS)
+  expect(parentDone()).toBe(1)
 })
 
-test("expired completion is dropped even if a child later finishes", async () => {
-  writeFileSync(configPath, JSON.stringify({ ...config, deferredCompleteTimeout: 20 }))
+test("expired completion is dropped even if a child later finishes or grace is running", async () => {
+  jest.useFakeTimers()
+  writeFileSync(configPath, JSON.stringify({ ...config, deferredCompleteTimeout: CHILDREN_SETTLE_MS * 2 }))
   await notifier.created("child1", "parent", null)
   await notifier.idle("parent")
-  await Bun.sleep(40)
+  await advance(CHILDREN_SETTLE_MS * 2 - 1)
   await notifier.idle("child1")
+  await advance(1)
+  await advance(CHILDREN_SETTLE_MS)
   expect(writes).toHaveLength(0)
+})
+
+// A notifier whose minDuration lookup for the parent waits until the test releases it.
+function withSlowElapsed() {
+  writeFileSync(configPath, JSON.stringify({ ...config, minDuration: 1 }))
+  const releases: (() => void)[] = []
+  notifier.dispose()
+  notifier = createNotifier({
+    info: async id => ({ isChild: id.startsWith("child"), title: id }),
+    elapsed: async id => id === "parent" ? new Promise(resolve => releases.push(() => resolve(null))) : null,
+    permissionPending: async () => true,
+  }, directory)
+  return async () => {
+    for (const release of releases.splice(0)) release()
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+  }
+}
+
+test("a child that starts while grace delivery looks up metadata cancels it", async () => {
+  jest.useFakeTimers()
+  const release = withSlowElapsed()
+  await notifier.created("child1", "parent", null)
+  await notifier.idle("parent")
+  await notifier.idle("child1")
+  await advance(CHILDREN_SETTLE_MS)
+  notifier.busy("child1")
+  await release()
+  expect(parentDone()).toBe(0)
+  await notifier.idle("child1")
+  await advance(CHILDREN_SETTLE_MS)
+  await release()
+  expect(parentDone()).toBe(1)
+})
+
+test("a repeated parent idle during grace keeps the wait", async () => {
+  jest.useFakeTimers()
+  await notifier.created("child1", "parent", null)
+  await notifier.idle("parent")
+  await notifier.idle("child1")
+  await advance(CHILDREN_SETTLE_MS / 2)
+  await notifier.idle("parent")
+  expect(parentDone()).toBe(0)
+  await advance(CHILDREN_SETTLE_MS / 2)
+  expect(parentDone()).toBe(1)
+  notifier.busy("parent")
+  await notifier.idle("parent")
+  expect(parentDone()).toBe(2)
+})
+
+test("expiry during grace delivery lookups drops the alert", async () => {
+  jest.useFakeTimers()
+  const release = withSlowElapsed()
+  writeFileSync(configPath, JSON.stringify({ ...config, minDuration: 1, deferredCompleteTimeout: CHILDREN_SETTLE_MS + 100 }))
+  await notifier.created("child1", "parent", null)
+  await notifier.idle("parent")
+  await notifier.idle("child1")
+  await advance(CHILDREN_SETTLE_MS)
+  await advance(100)
+  await release()
+  expect(parentDone()).toBe(0)
 })
