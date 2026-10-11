@@ -1,6 +1,5 @@
 import { execFile, execFileSync, execSync } from "child_process"
-import { accessSync, constants, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "fs"
-import { tmpdir } from "os"
+import { accessSync, constants, readFileSync, statSync } from "fs"
 import { delimiter, join } from "path"
 import { getWindowsFocus } from "./focus-windows"
 
@@ -58,8 +57,31 @@ function execFileWithTimeout(command: string, args: readonly string[], timeoutMs
   }
 }
 
+function execFileAsync(command: string, args: readonly string[], timeout = 500): Promise<string | null> {
+  return new Promise(resolve => {
+    execFile(command, args, { timeout, encoding: "utf-8", windowsHide: true }, (error, stdout) => {
+      resolve(error ? null : stdout.trim())
+    })
+  })
+}
+
 function isNumericWindowId(value: string): boolean {
   return /^\d+$/.test(value)
+}
+
+// KWin 6 / kdotool identify native Wayland windows with braced UUIDs.
+// Keep this validator separate from numeric X11/Sway/Niri IDs.
+export function isKDEWindowId(value: string): boolean {
+  return isNumericWindowId(value) || /^\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\}$/i.test(value)
+}
+
+function firstKDEWindowId(output: string | null): string | null {
+  return output?.split(/\s+/).find(isKDEWindowId) ?? null
+}
+
+function getPinnedKDEWindowId(): string | null {
+  const id = process.env.OPENCODE_NOTIFIER_WINDOW_ID?.trim()
+  return id && isKDEWindowId(id) ? id : null
 }
 
 function isSafeCompositorWindowId(value: string): boolean {
@@ -148,7 +170,7 @@ function getLinuxWaylandActiveWindowId(): string | null {
   if (env.HYPRLAND_INSTANCE_SIGNATURE) return getHyprlandActiveWindowId()
   if (env.NIRI_SOCKET) return getNiriActiveWindowId()
   if (env.SWAYSOCK) return getSwayActiveWindowId()
-  if (env.KDE_SESSION_VERSION) return firstNumericWindowId(execWithTimeout("kdotool getactivewindow"))
+  if (env.KDE_SESSION_VERSION) return firstKDEWindowId(execWithTimeout("kdotool getactivewindow"))
   if (isGnomeLikeSession(env)) return getGnomeShellWindowKey() ?? getGnomeAtspiActiveWindowKey()
   return null
 }
@@ -364,7 +386,7 @@ function getGnomeShellWindowKey(): string | null {
 }
 
 export function isTerminalJumpBackSupported(): boolean {
-  if (isKDEJumpBackSupported()) return true
+  if (isKDEJumpBackSupported()) return !!(getPinnedKDEWindowId() ?? cachedWindowId)
   return process.platform === "linux" && !!process.env.WAYLAND_DISPLAY && isGnomeLikeSession()
     && !!cachedWindowId?.startsWith("gnome:")
 }
@@ -478,7 +500,12 @@ function getActiveWindowId(): string | null {
   return null
 }
 
-const cachedWindowId: string | null = getActiveWindowId()
+// KDE capture is awaited by the terminal's setup. Import-time foreground
+// capture can belong to another app when clients start or reload in background.
+let cachedWindowId: string | null =
+  process.platform === "linux" && process.env.KDE_SESSION_VERSION
+    ? null
+    : getActiveWindowId()
 
 let cachedWindowTitleValue: string | null | undefined
 
@@ -600,11 +627,11 @@ function getWindowIdFromXdotool(searchTerm: string): string | null {
 }
 
 function getWindowIdFromKdotool(searchTerm: string): string | null {
-  return firstNumericWindowId(execFileWithTimeout("kdotool", ["search", "--classname", searchTerm]))
+  return firstKDEWindowId(execFileWithTimeout("kdotool", ["search", "--classname", searchTerm]))
 }
 
 function getWindowTitleFromKdotool(windowId: string): string | null {
-  if (!isNumericWindowId(windowId)) return null
+  if (!isKDEWindowId(windowId)) return null
   return execFileWithTimeout("kdotool", ["getwindowname", windowId])
 }
 
@@ -711,9 +738,8 @@ function getTerminalWindowId(): string | null {
         return cachedId
       }
     }
-    // On KDE Wayland, kdotool may not be available, so we rely on KWin scripts
     if (isKDE) {
-      return cachedId || "kde-wayland"
+      return cachedId
     }
     return cachedId
   }
@@ -744,54 +770,70 @@ function focusLinuxWindowX11(windowId: string): void {
   }
 }
 
-function focusLinuxWindowKDE(windowId: string): void {
-  if (!isNumericWindowId(windowId)) return
+const LINUX_EMBEDDED_TERMINAL_APPS = new Set(["code", "code-insiders", "code-oss", "codium", "cursor", "obsidian", "zed"])
 
-  try {
-    const result = firstNumericWindowId(execWithTimeout("kdotool getactivewindow"))
-    if (result === windowId) return
-    execFileSync("kdotool", ["windowactivate", windowId], { timeout: 1000, stdio: "ignore" })
-  } catch {
-    // kdotool not available, try KWin script approach
-    focusKDEWithKWinScript()
+function getLinuxHostProcessIDs(): number[] {
+  const hosts: number[] = []
+  const seen = new Set<number>()
+  let pid = process.pid
+  for (let depth = 0; depth < 32 && pid > 1 && !seen.has(pid); depth++) {
+    seen.add(pid)
+    try {
+      const name = readFileSync(`/proc/${pid}/comm`, "utf-8").trim().toLowerCase()
+      if (LINUX_TERMINAL_APPS.has(name) || LINUX_EMBEDDED_TERMINAL_APPS.has(name) || name === "gnome-terminal-") hosts.push(pid)
+      const stat = readFileSync(`/proc/${pid}/stat`, "utf-8")
+      // comm can contain spaces and parentheses; fields after its closing ')'
+      // start with the state and parent PID.
+      const parent = Number(stat.slice(stat.lastIndexOf(")") + 1).trim().split(/\s+/)[1])
+      if (!Number.isInteger(parent) || parent <= 0) break
+      pid = parent
+    } catch { break }
   }
+  return hosts
 }
 
-// Walk up the process tree to find the terminal PID dynamically
-function findTerminalPid(): number {
-  try {
-    let currentPid = process.pid
+function expectedLinuxHostClasses(termProgram: string | undefined): string[] {
+  const term = termProgram?.toLowerCase() ?? ""
+  if (term === "vscode") return ["code", "code-insiders", "code-oss", "vscodium", "codium"]
+  if (LINUX_TERMINAL_APPS.has(term) || LINUX_EMBEDDED_TERMINAL_APPS.has(term)) return [term]
+  return []
+}
 
-    // Walk up the process tree
-    while (currentPid > 1) {
-      try {
-        // Read the parent PID from /proc
-        const statContent = readFileSync(`/proc/${currentPid}/stat`, "utf-8")
-        // Extract parent PID from stat file (field 4)
-        const match = statContent.match(/^\d+\s+\([^)]+\)\s+\S\s+(\d+)/)
-        if (!match) break
-
-        const ppid = parseInt(match[1], 10)
-
-        // Read the command name
-        const cmdline = readFileSync(`/proc/${ppid}/comm`, "utf-8").trim()
-
-        // Check if this looks like a terminal
-        if (cmdline.match(/ghostty|konsole|gnome-terminal|xterm|alacritty|kitty|wezterm|terminator|tilix|foot/i)) {
-          return ppid
-        }
-
-        currentPid = ppid
-      } catch {
-        break
-      }
+async function getKDEStartupWindowId(): Promise<string | null> {
+  const pinned = getPinnedKDEWindowId()
+  if (pinned) return pinned
+  const active = firstKDEWindowId(await execFileAsync("kdotool", ["getactivewindow"]))
+  const hosts = getLinuxHostProcessIDs()
+  for (const pid of hosts) {
+    // kdotool defaults to OR. With an empty title pattern, --pid alone returns
+    // every window; --all is required for an actual process ownership check.
+    const output = await execFileAsync("kdotool", ["search", "--all", "--pid", String(pid)])
+    const ids = [...new Set(output?.split(/\s+/).filter(isKDEWindowId) ?? [])]
+    if (ids.length === 1) {
+      debugFocusState(`KDE captured host window=${ids[0]} pid=${pid}`)
+      return ids[0]
     }
-
-    // Fallback to PPID if no terminal found
-    return process.ppid
-  } catch {
-    return process.ppid
+    if (ids.length > 1) {
+      const result = active && ids.includes(active) ? active : null
+      debugFocusState(`KDE ambiguous host pid=${pid} windows=${ids.length} captured=${result ?? "null"}`)
+      return result
+    }
   }
+  if (hosts.length) {
+    debugFocusState("KDE startup capture skipped: host ancestors have no matching window")
+    return null
+  }
+  // Embedded launchers across sandbox boundaries can lose their host ancestry.
+  // Preserve focused-startup capture there, but never accept a different app
+  // when a known TERM_PROGRAM tells us which host to expect.
+  if (!active) return null
+  const expected = expectedLinuxHostClasses(process.env.TERM_PROGRAM)
+  if (expected.length) {
+    const className = (await execFileAsync("kdotool", ["getwindowclassname", active]))?.toLowerCase().split(".").pop()
+    if (!className || !expected.includes(className)) return null
+  }
+  debugFocusState(`KDE captured startup foreground window=${active} (host ancestry unavailable)`)
+  return active
 }
 
 let cachedQdbusBinary: string | null | undefined
@@ -834,207 +876,14 @@ export function resolveQdbusBinary(): string | null {
   return cachedQdbusBinary
 }
 
-function focusKDEWithKWinScript(): void {
-  try {
-    const pinnedWindowId = process.env.OPENCODE_NOTIFIER_WINDOW_ID?.trim() || null
-    if (pinnedWindowId && isNumericWindowId(pinnedWindowId)) {
-      try {
-        execFileSync("kdotool", ["windowactivate", pinnedWindowId], { timeout: 1500, stdio: "ignore" })
-        return
-      } catch {
-      }
-    }
-
-    if (cachedWindowId && isNumericWindowId(cachedWindowId)) {
-      try {
-        execFileSync("kdotool", ["windowactivate", cachedWindowId], { timeout: 1500, stdio: "ignore" })
-        return
-      } catch {
-      }
-    }
-
-    // Find terminal PID dynamically (OpenCode might be a daemon)
-    const terminalPid = findTerminalPid()
-    const currentPid = process.pid
-    const termProgram = (process.env.TERM_PROGRAM || "terminal").toLowerCase()
-    const cwd = process.cwd().toLowerCase()
-    const cwdBase = cwd.split("/").filter(Boolean).pop() || ""
-    const cachedTitle = (getCachedWindowTitle() || "").toLowerCase()
-
-    // Create a temporary KWin script
-    const scriptContent = `
-function activateTargetWindow(window) {
-    // Jump to the window's desktop/activity first, then activate.
-    // This works more reliably on Plasma than moving windows between desktops.
-    try {
-        if (window.desktops && window.desktops.length > 0) {
-            workspace.currentDesktop = window.desktops[0];
-        } else if (typeof window.desktop === "number" && window.desktop > 0) {
-            workspace.currentDesktop = window.desktop;
-        }
-    } catch (e) {}
-
-    try {
-        if (window.activities && window.activities.length > 0 && typeof workspace.currentActivity !== "undefined") {
-            workspace.currentActivity = window.activities[0];
-        }
-    } catch (e) {}
-
-    try { window.minimized = false; } catch (e) {}
-
-    try { workspace.activeWindow = window; } catch (e) {}
-    try {
-        if (typeof workspace.activateWindow === "function") {
-            workspace.activateWindow(window);
-        }
-    } catch (e) {}
-    try { window.active = true; } catch (e) {}
-
-    // Nudge stacking so KWin treats this like an explicit user jump.
-    try {
-        window.keepAbove = true;
-        window.keepAbove = false;
-    } catch (e) {}
-}
-
-function isLikelyTerminal(window) {
-    var resourceClass = (window.resourceClass || "").toLowerCase();
-    var resourceName = (window.resourceName || "").toLowerCase();
-    var caption = (window.caption || "").toLowerCase();
-
-    return resourceClass.indexOf("ghostty") !== -1 ||
-           resourceName.indexOf("ghostty") !== -1 ||
-           caption.indexOf("ghostty") !== -1 ||
-           resourceClass.indexOf("konsole") !== -1 ||
-           resourceName.indexOf("konsole") !== -1 ||
-           caption.indexOf("konsole") !== -1 ||
-           resourceClass.indexOf("terminal") !== -1 ||
-           resourceName.indexOf("terminal") !== -1;
-}
-
-function findAndActivateTerminal() {
-    var allWindows = workspace.windowList();
-    var terminalPid = ${terminalPid};
-    var termProgramHint = ${JSON.stringify(termProgram)};
-    var cwdHint = ${JSON.stringify(cwd)};
-    var cwdBaseHint = ${JSON.stringify(cwdBase)};
-    var cachedTitleHint = ${JSON.stringify(cachedTitle)};
-
-    function contains(haystack, needle) {
-        return !!needle && needle.length > 0 && haystack.indexOf(needle) !== -1;
-    }
-
-    function windowScore(window) {
-        var resourceClass = (window.resourceClass || "").toLowerCase();
-        var resourceName = (window.resourceName || "").toLowerCase();
-        var caption = (window.caption || "").toLowerCase();
-        var score = 0;
-
-        if (window.pid === terminalPid) score += 30;
-        if (contains(caption, "opencode")) score += 60;
-        if (contains(caption, cachedTitleHint)) score += 50;
-        if (contains(caption, cwdBaseHint)) score += 35;
-        if (contains(caption, cwdHint)) score += 20;
-        if (contains(resourceClass, termProgramHint) || contains(resourceName, termProgramHint) || contains(caption, termProgramHint)) score += 20;
-        if (isLikelyTerminal(window)) score += 10;
-        if (window.minimized === true) score -= 5;
-
-        return score;
-    }
-
-    var bestWindow = null;
-    var bestScore = -1;
-
-    for (var i = 0; i < allWindows.length; i++) {
-        var candidate = allWindows[i];
-        var score = windowScore(candidate);
-        if (score > bestScore) {
-            bestWindow = candidate;
-            bestScore = score;
-        }
-    }
-
-    // Require enough confidence to avoid jumping to unrelated terminals.
-    if (bestWindow && bestScore >= 30) {
-        activateTargetWindow(bestWindow);
-        return true;
-    }
-
-    return false;
-}
-
-findAndActivateTerminal();
-`;
-    
-    const pluginName = `opencode-focus-${currentPid}`
-    let scriptDirectory: string | null = null
-    let scriptPath: string | null = null
-    let scriptLoaded = false
-
-    const cleanupScript = () => {
-      if (!scriptPath || !scriptDirectory) return
-      try {
-        rmSync(scriptPath, { force: true })
-      } catch {}
-      try {
-        rmSync(scriptDirectory, { recursive: true, force: true })
-      } catch {}
-    }
-
-    const qdbus = resolveQdbusBinary()
-    if (!qdbus) {
-      throw new Error("qdbus not found")
-    }
-
-    try {
-      scriptDirectory = mkdtempSync(join(tmpdir(), "opencode-focus-"))
-      scriptPath = join(scriptDirectory, "script.kwinscript")
-      writeFileSync(scriptPath, scriptContent, { encoding: "utf-8", mode: 0o600, flag: "wx" })
-
-      execFileSync(
-        qdbus,
-        ["org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.loadScript", scriptPath, pluginName],
-        { encoding: "utf-8", timeout: 2000, stdio: "ignore" }
-      )
-      scriptLoaded = true
-
-      execFileSync(qdbus, ["org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.start"], {
-        timeout: 2000,
-        stdio: "ignore",
-      })
-
-      cleanupScript()
-
-      setTimeout(() => {
-        try {
-          execFileSync(qdbus, ["org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.unloadScript", pluginName], {
-            timeout: 500,
-            stdio: "ignore",
-          })
-        } catch {}
-      }, 1000)
-    } catch {
-      if (scriptLoaded) {
-        try {
-          execFileSync(qdbus, ["org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.unloadScript", pluginName], {
-            timeout: 500,
-            stdio: "ignore",
-          })
-        } catch {}
-      }
-      cleanupScript()
-      throw new Error("Unable to activate the terminal through KWin")
-    }
-
-  } catch {
-    // Fall back to xdotool
-    try {
-      const cachedId = cachedWindowId;
-      if (cachedId && isNumericWindowId(cachedId)) {
-        execFileSync("xdotool", ["windowactivate", cachedId], { timeout: 1000, stdio: "ignore" })
-      }
-    } catch {}
+async function focusKDEWindow(): Promise<void> {
+  const id = getPinnedKDEWindowId() ?? cachedWindowId
+  if (!id || !isKDEWindowId(id)) {
+    debugFocusState("KDE jump-back skipped: originating window is unknown")
+    return
   }
+  const result = await execFileAsync("kdotool", ["windowactivate", id], 1500)
+  debugFocusState(`KDE jump-back window=${id} ${result === null ? "failed; no other window selected" : "activated"}`)
 }
 
 function focusLinuxWindowHyprland(windowId: string): void {
@@ -1069,20 +918,20 @@ function focusLinuxWindowNiri(windowId: string): void {
   }
 }
 
-export function captureStartupWindowId(): void {
-  if (!isKDEJumpBackSupported()) {
-    return
-  }
+let startupWindowCapture: Promise<void> | undefined
 
-  const existing = process.env.OPENCODE_NOTIFIER_WINDOW_ID?.trim()
-  if (existing) {
-    return
-  }
-
-  const detected = execWithTimeout("kdotool getactivewindow", 1000)
-  if (detected && /^\d+$/.test(detected)) {
-    process.env.OPENCODE_NOTIFIER_WINDOW_ID = detected
-  }
+export async function captureStartupWindowId(): Promise<void> {
+  if (process.platform !== "linux" || !process.env.KDE_SESSION_VERSION) return
+  startupWindowCapture ??= (async () => {
+    cachedKDEJumpBackSupport = await execFileAsync("kdotool", ["--help"], 1000) !== null
+    if (!cachedKDEJumpBackSupport) return
+    cachedWindowId = await getKDEStartupWindowId()
+    cachedWindowTitleValue = undefined
+    // Do not write an automatically captured ID into process.env. It can be
+    // inherited by another client or mistaken for a user override on reload.
+    debugFocusState(`KDE startup capture=${cachedWindowId ?? "null"}`)
+  })().catch(error => debugFocusState(`KDE startup capture failed: ${String(error)}`))
+  await startupWindowCapture
 }
 
 export async function focusTerminal(): Promise<void> {
@@ -1115,9 +964,9 @@ export async function focusTerminal(): Promise<void> {
       return
     }
     
-    // For KDE Plasma, use KWin script approach which works on both X11 and Wayland
+    // KDE uses the same captured host identity on X11 and Wayland.
     if (env.KDE_SESSION_VERSION) {
-      focusKDEWithKWinScript()
+      await focusKDEWindow()
       return
     }
     

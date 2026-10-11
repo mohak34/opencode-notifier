@@ -95,7 +95,8 @@ export async function handleEvent(
   elapsedSeconds?: number | null,
   sessionTitle?: string | null,
   sessionID?: string | null,
-  agentName?: string | null
+  agentName?: string | null,
+  focusSession?: (sessionID: string) => void
 ): Promise<void> {
   // Focus is only queried when some channel cares about it.
   const focusChannels = config.suppressWhenFocused === true ? CHANNELS : config.suppressWhenFocused || []
@@ -142,10 +143,14 @@ export async function handleEvent(
       if (clickCommand.enabled) {
         runCommand({ ...config, command: clickCommand }, eventType, message, sessionTitle, agentName, projectName, timestamp, turn, sessionID)
       }
-      if (focusOnClick) void focusTerminal().then(
-        () => debugFocusState("focusTerminal() finished"),
-        (error) => debugFocusState(`focusTerminal() threw: ${String(error)}`)
-      )
+      if (focusOnClick) {
+        try { if (sessionID) focusSession?.(sessionID) }
+        catch (error) { debugFocusState(`session selection failed: ${String(error)}`) }
+        void focusTerminal().then(
+          () => debugFocusState("focusTerminal() finished"),
+          (error) => debugFocusState(`focusTerminal() threw: ${String(error)}`)
+        )
+      }
     } : undefined
     promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping,
       onNotificationClick, config.windows.appID, focusOnClick ? "Jump to terminal" : "Run command"))

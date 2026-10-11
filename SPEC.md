@@ -41,14 +41,14 @@ An event is delivered on a channel only if every check passes, in this order:
 2. `complete` and `subagent_complete`: the session ran longer than `minDuration`.
 3. `complete` with `deferCompleteUntilChildrenIdle`: a parent that goes idle with tracked child sessions running waits for them, at most `deferredCompleteTimeout`. Once none run, it waits a further 2 seconds for the parent to resume. A parent run cancels the alert, and the parent's next idle decides again, so a parent that resumes within those 2 seconds alerts once, after its final turn. A parent that resumes later alerts early and again after its final turn. A child that starts during those 2 seconds restarts the wait when it stops. An expired wait drops the alert.
 4. `permission`: the request is still pending after a 300 ms grace (auto-approved requests stay silent), and the same request has not already alerted.
-5. OpenCode 2 terminals: when several on one machine receive the same event, only the first to claim it delivers. The claim is a marker file in the user's temp directory; if it cannot be written, every terminal delivers.
+5. OpenCode 2 terminals: eligible clients with the session's family open in a tab or current route take priority over unrelated clients in the same project/workspace. They publish temporary presence with a one-second heartbeat; dead processes and presence older than five seconds are ignored. Among open-session owners, only the first to claim the event delivers. Without an owner, a client still claims after a brief grace. Unavailable UI state or registry fails open to the existing claim. The claim is a marker file in the user's temp directory; if it cannot be written, every terminal delivers.
 6. Focus: with `suppressWhenFocused`, skip when the OpenCode terminal (and its pane, under tmux, WezTerm or Zellij) is in front. `true` skips every channel; a list of channels skips only those. Unknown focus means not focused.
 7. Sound: at most one sound per second across all events.
 
 ## Guarantees
 
 - No hook throws into or blocks the host. Failures are swallowed, and logged when `OPENCODE_NOTIFIER_DEBUG=1`.
-- Focus detection fails open.
+- Focus detection fails open. On KDE, a valid `OPENCODE_NOTIFIER_WINDOW_ID` overrides the captured host window for both suppression and jump-back; numeric IDs and braced KWin UUIDs are accepted. Capture first resolves terminal/editor ancestors to their window, using the foreground window only to disambiguate multiple windows belonging to that host. Without host ancestry, focused-startup capture supports embedded launchers, rejecting a foreground app that conflicts with a known `TERM_PROGRAM`. Unknown or ambiguous targets keep notifications enabled and have no jump action. Capture does not modify the process environment, and failed activation never selects another terminal. V2 jump-back selects the event's session in the delivering terminal's UI before activating its host window. V1 activates the host window only.
 - A missing or invalid config file means defaults. Config path: `OPENCODE_NOTIFIER_CONFIG_PATH`, else `~/.config/opencode/opencode-notifier.json`.
 - Unset new options reproduce the previous release's behavior.
 - A volume of `0` skips playback on every platform.

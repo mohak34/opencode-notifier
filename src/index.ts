@@ -103,7 +103,7 @@ function getMessageUpdatedInfo(event: unknown): MessageUpdatedInfo {
 }
 
 export const NotifierPlugin: Plugin = async ({ client, directory }) => {
-  captureStartupWindowId()
+  await captureStartupWindowId()
   const clientEnv = process.env.OPENCODE_CLIENT
   if (clientEnv && clientEnv !== "cli" && !loadConfig().enableOnDesktop) return {}
   const notifier = createNotifier({

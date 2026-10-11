@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- KDE focus suppression and jump-back accept KWin UUID window IDs and resolve the originating terminal/editor through process ancestry, so background VS Code clients no longer capture Ghostty; explicit IDs override both checks and ambiguous or closed targets never redirect to another terminal (#141; issue #133).
+- V2 alerts prefer a client with the completed session's family open, preventing an unrelated Ghostty or VS Code client from claiming an Obsidian session's jump action; clicking also selects the completed session in the delivering client (#141; issue #133).
+
+### Upgrade notes
+
+- V2 clients now share open-session presence as well as event claims; when no eligible client has the session open, alerts still use the first claim, and V1 delivery is unchanged.
+
 ## [0.8.1] - 2026-10-09
 
 ### Fixed

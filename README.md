@@ -26,7 +26,9 @@ Restart OpenCode. The package contains both implementations; you do not select a
 
 Sounds, desktop popups, terminal bells, Ghostty notifications, and focus detection run in the terminal client. Custom commands run once per event on the server, including when no terminal is open. This uses the existing `command` configuration; no external notification service is bundled.
 
-With a remote server, put sound and popup settings on your local computer and custom-command settings on the server. Event-command script paths refer to the server's filesystem. Click-command paths refer to the computer displaying the notification. Focus suppression applies to local alerts, not server commands. Each attached terminal receives alerts for its project. When several terminals on one computer show the same session, only the first to receive an event alerts; terminals on other computers each alert.
+With a remote server, put sound and popup settings on your local computer and custom-command settings on the server. Event-command script paths refer to the server's filesystem. Click-command paths refer to the computer displaying the notification. Focus suppression applies to local alerts, not server commands. Each attached terminal receives alerts for its project. On one computer, clients with the session's family open in a tab or current route take priority over unrelated clients in the same project. If several eligible clients have it open, only the first to claim the event alerts. If none have it open, an eligible client still alerts after a brief fallback grace; terminals on other computers each alert.
+
+Clients publish their open-session IDs in private temporary files, refreshed once per second and removed on disposal. Dead processes and presence older than five seconds are ignored. If the registry or client-local UI APIs are unavailable, alerts fail open through the existing event claim.
 
 `opencode run` and Desktop/Web clients do not load this terminal component, so they receive no plugin sound, popup, or bell. Server commands still run. V1 delivery and its `enableOnDesktop` behavior are unchanged.
 
@@ -380,7 +382,7 @@ scripts you trust.
 
 On Linux, use the explicit **Run command** action button; popup body clicks are not reliably delivered. The notification daemon must support actions and `notify-send` must support `--action`. The click listener expires after `timeout` plus one second. Windows toasts and macOS `node-notifier` deliver their activation callback; AppleScript and Ghostty OSC notifications do not support this command.
 
-`focusOnClick` defaults to `true` and enables the built-in KDE/GNOME jump-back when available. Set it to `false` for a script-only action. When both are enabled, clicking runs your script and focuses the terminal. On V2, configure click commands in the local terminal's configuration and event commands on the server. `events.<event>.command` controls event commands only; a click command is available for any enabled popup.
+`focusOnClick` defaults to `true` and enables the built-in KDE/GNOME jump-back when available. On V2, jump-back also selects the completed session in the delivering client, using its tab or session route. Set it to `false` for a script-only action. When both are enabled, clicking runs your script and focuses the terminal. On V2, configure click commands in the local terminal's configuration and event commands on the server. `events.<event>.command` controls event commands only; a click command is available for any enabled popup.
 
 #### Example: Log events to a file
 
@@ -555,7 +557,9 @@ Works with all major notification daemons (GNOME, dunst, mako, swaync, etc.) on 
 
 On KDE Plasma and GNOME Wayland, use the explicit **Jump to terminal** action button. Clicking the popup body is not reliably routed back to the plugin.
 
-On KDE with `kdotool` installed, the plugin captures the startup terminal window ID and jumps back to that window.
+On KDE with `kdotool` installed, the plugin finds the host window from the OpenCode client's terminal or editor process ancestry and uses it for both focus suppression and jump-back. This lets a VS Code terminal started in the background return to VS Code even if Ghostty was focused. Numeric IDs and KWin 6 braced UUIDs are supported. If a host owns several windows, the focused window must belong to that host to resolve the ambiguity; otherwise notifications remain enabled and no jump action is offered. An explicit `OPENCODE_NOTIFIER_WINDOW_ID` takes precedence for both checks.
+
+Sandboxed or embedded launchers can hide process ancestry. In that case, keep the intended host window focused when OpenCode starts, or pin its ID explicitly. A known `TERM_PROGRAM` must match the foreground app before it can be captured. Automatically captured IDs stay local to the client and are not exported into its environment. If the captured window closes or activation fails, the plugin does not select another terminal.
 
 On GNOME Wayland, the bundled **OpenCode Notifier Jump Back** Shell extension is needed **only for the Jump to terminal action**. Normal notification popups, sounds, and existing focus suppression work without it.
 
@@ -700,7 +704,9 @@ export OPENCODE_NOTIFIER_WINDOW_ID="$(kdotool getactivewindow)"
 opencode
 ```
 
-Manual pinning bypasses heuristic window matching and should activate that exact window on notification action click.
+Manual pinning uses that exact window for both focus suppression and notification action clicks. For Flatpak or other embedded launchers, capture the host window ID before crossing the sandbox boundary and pass `OPENCODE_NOTIFIER_WINDOW_ID` into the OpenCode client environment. Process ancestry and `TERM_PROGRAM` are not needed when the window ID is available.
+
+Jump-back activates the host window. On V2 it also selects the event's OpenCode session in that terminal client; it cannot switch between separate embedded terminals managed by the host app. V1 needs `onClickCommand` with `{sessionID}` if the integration provides a session-selection command. Closing or restarting an embedded terminal is managed by its host integration; the notifier does not start or supervise interactive OpenCode clients.
 
 **X11 deterministic jump-back**
 
