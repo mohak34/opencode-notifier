@@ -1,3 +1,4 @@
+import { disposeLinuxNotifications } from "./notify"
 import type { Plugin, PluginModule } from "@opencode-ai/plugin"
 import { loadConfig } from "./config"
 import { captureStartupWindowId } from "./focus"
@@ -135,6 +136,7 @@ export const NotifierPlugin: Plugin = async ({ client, directory }) => {
 
   return {
     async dispose() {
+      disposeLinuxNotifications()
       clearTimeout(connectedTimer)
       notifier.dispose()
     },

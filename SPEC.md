@@ -53,6 +53,10 @@ An event is delivered on a channel only if every check passes, in this order:
 - Unset new options reproduce the previous release's behavior.
 - A volume of `0` skips playback on every platform.
 
+## Linux notification actions
+
+Actionable popups are sent and handled on one persistent session D-Bus connection. Delivery resolves when `Notify` returns the notification ID. Popup expiry is requested with `timeout`; it is not a sender or handler deadline. Handlers are removed on `NotificationClosed`, after one activation, when replaced, or when the host disposes the plugin. Replacements route clicks to the newest handler. Daemon restarts clear IDs and handlers. The connection does not keep an exiting host alive. To bound retained handlers, the oldest popup is explicitly closed before exceeding 128 handlers. Calls time out after two seconds; failed delivery falls back to a plain popup without actions.
+
 ## Release tracks
 
 `vX.Y.Z-beta.N` tags publish to npm `beta`, `vX.Y.Z` tags to `latest`. Same code, different version string. A stable release follows a confirmed beta.

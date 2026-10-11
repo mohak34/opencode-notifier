@@ -32,7 +32,7 @@ test("TUI follows location changes and unsubscribes on disposal", async () => {
       data: { listen(callback: typeof listener) { listener = callback; return () => {stopped = true} } },
     } as never)
     location = { directory: "/second-project" }
-    listener?.({ details: { id:"change", type:"session.execution.succeeded", location, data:{sessionID:"session"} } as never })
+    listener?.({ details: { id:`change-${directory}`, type:"session.execution.succeeded", location, data:{sessionID:"session"} } as never })
     for (let attempts = 0; attempts < 50 && !writes.some(value => value.includes("ENTRYPOINT_DONE")); attempts++) await Bun.sleep(5)
     const notifications = writes.filter(value => value.includes("ENTRYPOINT_DONE"))
     expect(notifications.length).toBe(1)

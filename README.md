@@ -202,7 +202,7 @@ Create `~/.config/opencode/opencode-notifier.json` with this example configurati
 - `notificationSystem` - On macOS, select `"osascript"` or `"node-notifier"` (default: "osascript"). Select `"ghostty"` on any platform running Ghostty for native OSC 9 notifications
 - `suppressGhosttySound` - macOS only: when `true` with `notificationSystem: "ghostty"`, skips the plugin's sound to avoid duplicating macOS Notification Center's default sound (default: false)
 - `minDuration` - Suppress `complete` and `subagent_complete` notifications when session finishes faster than this many seconds (default: 0). See [Minimum duration threshold](#minimum-duration-threshold)
-- `linux.grouping` - Linux only: replace notifications in-place instead of stacking (default: false). Requires `notify-send` 0.8+
+- `linux.grouping` - Linux only: replace notifications in-place instead of stacking (default: false). Actionable popups use D-Bus; plain popups require `notify-send` 0.8+
 
 ### Events
 
@@ -378,7 +378,7 @@ scripts you trust.
 }
 ```
 
-On Linux, use the explicit **Run command** action button; popup body clicks are not reliably delivered. The notification daemon must support actions and `notify-send` must support `--action`. The click listener expires after `timeout` plus one second. Windows toasts and macOS `node-notifier` deliver their activation callback; AppleScript and Ghostty OSC notifications do not support this command.
+On Linux, use the explicit **Run command** action button; popup body clicks are not reliably delivered. The notification daemon must support actions. Actionable popups use a persistent D-Bus connection, so clicks remain available until the daemon closes the notification, including when hovering extends its lifetime. Windows toasts and macOS `node-notifier` deliver their activation callback; AppleScript and Ghostty OSC notifications do not support this command.
 
 `focusOnClick` defaults to `true` and enables the built-in KDE/GNOME jump-back when available. Set it to `false` for a script-only action. When both are enabled, clicking runs your script and focuses the terminal. On V2, configure click commands in the local terminal's configuration and event commands on the server. `events.<event>.command` controls event commands only; a click command is available for any enabled popup.
 
@@ -512,8 +512,8 @@ Work from third-party delegation plugins without native child-session events, or
 | Linux Wayland (Hyprland)                 | `hyprctl activewindow`; legacy or Lua (0.55+) `dispatch` for click-to-focus | None | Tested (0.56.2, Lua config) |
 | Linux Wayland (Niri)                     | `niri msg --json focused-window`       | None                  | Tested                         |
 | Linux Wayland (Sway)                     | `swaymsg -t get_tree`                  | None                  | Untested                       |
-| Linux Wayland (KDE)                      | `kdotool`                              | `kdotool` installed | Tested                         |
-| Linux Wayland (GNOME)                    | Optional Shell bridge, then AT-SPI (`gdbus`) | `gdbus` installed   | AT-SPI tested (Ubuntu 26.04.1 LTS + GNOME Shell 50.1 + Ghostty 1.3.0); Shell bridge needs desktop validation |
+| Linux Wayland (KDE)                      | `kdotool`                              | `kdotool` installed | Focus tested; persistent popup actions untested on live Plasma |
+| Linux Wayland (GNOME)                    | Optional Shell bridge, then AT-SPI (`gdbus`) | `gdbus` installed   | AT-SPI tested (Ubuntu 26.04.1 LTS + GNOME Shell 50.1 + Ghostty 1.3.0); Shell bridge and persistent popup actions need desktop validation |
 | Linux Wayland (river, dwl, Cosmic, etc.) | No window backend; pane fallback when available | -                 | Notifies when focus cannot be determined |
 | Windows                                  | Foreground window vs. OpenCode's console owner, via PowerShell | None | Untested |
 
@@ -547,7 +547,7 @@ Enable grouping to replace notifications in-place instead of stacking:
 }
 ```
 
-With grouping enabled, each new notification replaces the previous one so you only see the latest event. This requires `notify-send` 0.8+ (standard on Ubuntu 22.04+, Debian 12+, Fedora 36+, Arch). On older systems it falls back to the default stacking behavior automatically.
+With grouping enabled, each new notification replaces the previous one so you only see the latest event. Actionable popups support replacement directly over D-Bus. Plain popups require `notify-send` 0.8+ (standard on Ubuntu 22.04+, Debian 12+, Fedora 36+, Arch); older versions fall back to stacking.
 
 Works with all major notification daemons (GNOME, dunst, mako, swaync, etc.) on both X11 and Wayland.
 
@@ -580,9 +580,9 @@ Restart OpenCode while the terminal window you want to return to is focused. Lea
 
 The extension targets GNOME Shell 45 through 50. The button appears when the plugin successfully captured a startup window through the extension. Automated checks cover the extension logic and communication, but window switching still needs validation on a real GNOME desktop.
 
-On Notification Spec 1.2 servers (e.g. GNOME Shell 50), `notify-send` 0.8+ refuses `--action` mode (`Actions are not supported by this notifications server`), shows the popup without its button, and exits. When that happens, or when `notify-send` is missing, the plugin replaces the popup directly over D-Bus with one carrying the button and listens for the click with `dbus-monitor` (both must be on `PATH`; `gdbus` is already required for GNOME features). Set `OPENCODE_NOTIFIER_DEBUG=1` to log when the fallback triggers.
+Actionable notifications are sent directly over D-Bus, including on Notification Spec 1.2 servers where `notify-send --action` refuses interactive mode. This path does not require `gdbus`, `dbus-monitor`, or `notify-send`. Set `OPENCODE_NOTIFIER_DEBUG=1` to log connection and delivery failures.
 
-Notification delivery returns once `notify-send` prints the notification ID. The click listener lasts for the configured notification `timeout` plus a one-second grace period, then closes even if the notification daemon ignores expiry.
+Actionable Linux notifications use the same persistent D-Bus connection for sending and handling clicks. Delivery returns once the daemon accepts the notification; `timeout` requests popup expiry and does not disconnect its sender. Hovered popups keep their actions until the daemon reports the notification closed. Grouped replacements keep only the latest click handler. Closing the OpenCode client disconnects the sender. At most 128 unused click handlers are retained; reaching that limit closes the oldest popup before retiring its handler. If D-Bus delivery fails or a call exceeds two seconds, the plugin tries a plain `notify-send` popup without actions.
 
 ## Updating
 

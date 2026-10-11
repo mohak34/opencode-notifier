@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Linux Jump to terminal and Run command buttons remain actionable while hovered popups outlive the requested timeout; their sender and handlers stay connected until notification closure or client shutdown (issue #134).
+
 ## [0.8.1] - 2026-10-09
 
 ### Fixed
