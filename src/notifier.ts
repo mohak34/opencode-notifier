@@ -37,7 +37,7 @@ interface NotifyOptions {
 }
 
 // Each host instance owns its timers and session state. The adapters only translate API data.
-export function createNotifier(access: SessionAccess, directory: string, delivery: Delivery = "all") {
+export function createNotifier(access: SessionAccess, directory: string, delivery: Delivery = "all", claim = claimDelivery) {
   const children = new Set<string>()
   const sequences = new Map<string, number>()
   const errors = new Set<string>()
@@ -108,7 +108,7 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
       agentName = info.agentName ?? null
     }
     if (disposed || (valid && !valid())) return
-    if (key && delivery === "terminal" && !claimDelivery(`${directory}\0${key}`)) return
+    if (key && delivery === "terminal" && !claim(`${directory}\0${key}`)) return
     const project = directory ? (current.showFullPath ? directory : basename(directory)) : null
     await handleEvent(current, event, project, elapsed, sessionTitle, sessionID, agentName ?? extractAgentNameFromSessionTitle(sessionTitle))
   }

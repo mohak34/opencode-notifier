@@ -3,13 +3,14 @@ import type { LocationRef, OpenCodeEvent } from "@opencode/client"
 import { debugFocusState as debug } from "./focus"
 import { createNotifier } from "./notifier"
 import type { Delivery } from "./notifier"
+import { claimDelivery } from "./claim"
 
 type Client = {
   session: Pick<Plugin.Context["session"], "get" | "context">
   permission: Pick<Plugin.Context["permission"], "list">
 }
 
-export function createV2Notifier(client: Client, location: LocationRef, delivery: Delivery) {
+export function createV2Notifier(client: Client, location: LocationRef, delivery: Delivery, claim = claimDelivery) {
   const notifier = createNotifier({
     async info(sessionID) {
       try {
@@ -36,7 +37,7 @@ export function createV2Notifier(client: Client, location: LocationRef, delivery
         return true
       }
     },
-  }, location.directory, delivery)
+  }, location.directory, delivery, claim)
   const seen = new Set<string>()
   const owned = new Map<string, Promise<boolean>>()
   let disposed = false
