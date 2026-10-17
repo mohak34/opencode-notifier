@@ -9,14 +9,17 @@ All notable changes to this project will be documented in this file.
 - KDE focus suppression and jump-back accept KWin UUID window IDs and resolve the originating terminal/editor through process ancestry, so background VS Code clients no longer capture Ghostty; explicit IDs override both checks and ambiguous or closed targets never redirect to another terminal (#141; issue #133).
 - V2 alerts prefer a client with the completed session's family open, preventing an unrelated Ghostty or VS Code client from claiming an Obsidian session's jump action; clicking also selects the completed session in the delivering client (#141; issue #133).
 - Linux Jump to terminal and Run command buttons remain actionable while hovered popups outlive the requested timeout; their sender and handlers stay connected until notification closure or client shutdown (#142; issue #134).
+- OpenCode V2 terminals skip alert deduplication and open-session presence when their shared temp directory is a symlink, owned by another user, or writable by others, so cleanup can no longer delete files outside it (#146; issue #145).
 
 ### Upgrade notes
 
 - V2 clients now share open-session presence as well as event claims; when no eligible client has the session open, alerts still use the first claim, and V1 delivery is unchanged.
+- No config changes. Terminals sharing a normal temp directory still deliver each alert once, and existing claim directories keep working.
 
 ### Contributors
 
 - Thanks to @kriss-spy for the KDE focus and V2 session routing fixes in #141 and the Linux action lifetime fix in #142.
+- Thanks to @YuriNek0 for reporting and fixing the claim cleanup issue in #146.
 
 ## [1.0.0] - 2026-10-14
 

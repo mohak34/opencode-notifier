@@ -2,7 +2,7 @@ import { randomUUID } from "crypto"
 import { mkdir, readdir, readFile, rename, unlink, writeFile } from "fs/promises"
 import { tmpdir } from "os"
 import { join } from "path"
-import { claimDelivery } from "./claim"
+import { claimDelivery, sharedDirectory } from "./claim"
 import { debugFocusState as debug } from "./focus"
 
 export interface TerminalState {
@@ -32,8 +32,10 @@ function alive(pid: number): boolean {
 // Presence is separate from the event claim: a slower client with this session
 // open must be preferred before a faster, unrelated client wins the claim.
 export function createTerminalClients(getState: () => TerminalState, rootSession: (sessionID: string) => string = id => id) {
-  const directory = join(tmpdir(), `opencode-notifier-${process.getuid?.() ?? "claims"}`, "clients")
-  const path = join(directory, `${randomUUID()}.json`)
+  const tempRoot = tmpdir()
+  const fileName = `${randomUUID()}.json`
+  // Our presence file, once written. Unsafe shared storage skips presence entirely.
+  let path: string | undefined
   let disposed = false
   let state: TerminalState | undefined
   let writing: Promise<void> | undefined
@@ -42,19 +44,25 @@ export function createTerminalClients(getState: () => TerminalState, rootSession
     if (disposed) return
     try { state = getState() } catch { return }
     if (writing) return bounded(writing, undefined)
+    const shared = sharedDirectory(tempRoot)
+    if (!shared) return
+    const directory = join(shared, "clients")
+    const target = join(directory, fileName)
     const snapshot = state
     writing = (async () => {
-      const temporary = path + ".tmp"
+      const temporary = target + ".tmp"
       try {
         await mkdir(directory, { recursive: true, mode: 0o700 })
         await writeFile(temporary, JSON.stringify({
           pid: process.pid, updated: Date.now(), location: snapshot.location,
           sessions: snapshot.sessions?.slice(0, 2048) ?? null,
         }), { mode: 0o600 })
-        if (!disposed) await rename(temporary, path)
-        else await unlink(temporary)
+        if (!disposed) {
+          await rename(temporary, target)
+          path = target
+        } else await unlink(temporary)
         // Disposal can race the asynchronous rename.
-        if (disposed) await unlink(path).catch(() => {})
+        if (disposed) await unlink(target).catch(() => {})
       } catch { await unlink(temporary).catch(() => {}) }
     })().finally(() => { writing = undefined })
     await bounded(writing, undefined)
@@ -62,12 +70,14 @@ export function createTerminalClients(getState: () => TerminalState, rootSession
 
   async function anotherOwner(sessionID: string, root: string): Promise<boolean> {
     const current = state
-    if (!current) return false
+    const shared = sharedDirectory(tempRoot)
+    if (!current || !shared) return false
+    const directory = join(shared, "clients")
     return bounded((async () => {
       const names = (await readdir(directory)).filter(name => /^[\da-f-]{36}\.json$/.test(name)).slice(0, 256)
       const matches = await Promise.all(names.map(async name => {
         const candidate = join(directory, name)
-        if (candidate === path) return false
+        if (name === fileName) return false
         try {
           const raw = await readFile(candidate, "utf8")
           if (raw.length > 256_000) return false
@@ -113,7 +123,7 @@ export function createTerminalClients(getState: () => TerminalState, rootSession
     dispose() {
       disposed = true
       clearInterval(heartbeat)
-      void unlink(path).catch(() => {})
+      if (path) void unlink(path).catch(() => {})
     },
   }
 }

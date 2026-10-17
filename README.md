@@ -801,6 +801,9 @@ If native notification delivery crashes OpenCode, disable native notifications a
 
 Debug lines go to stderr. On V2 the full-screen terminal UI hides them, and they are not written to OpenCode's log file. On V2, check behavior directly: put another window in front, trigger an event, and see whether the alert arrives.
 
+**OpenCode 2: Duplicate alerts across terminals?**
+Terminals share one directory under the system temp directory (usually `/tmp/opencode-notifier-<uid>` on Linux) for event claims and open-session presence, so only one alerts per event. If that path is a symlink, belongs to another user, is writable by others, or cannot be used, claims and presence are skipped and each terminal alerts on its own. A symlinked `/tmp` itself is fine.
+
 ## TypeScript imports
 
 Loading this plugin through OpenCode configuration does not require installing SDKs separately. If a TypeScript project imports the package directly, its declarations reference both OpenCode SDK generations. Install the optional type peers in that project:

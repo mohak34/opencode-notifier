@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test"
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "fs"
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
 import { createTerminalClients } from "./terminal-clients"
@@ -54,6 +54,23 @@ test("clients without UI state and a broken registry preserve fail-open alerts",
   const client = createTerminalClients(() => ({ location, sessions: null }))
   try {
     expect(await client.claim("question", "unknown")).toBe(true)
+  } finally { client.dispose() }
+})
+
+// Symlink creation on Windows can require privileges unavailable to the test runner.
+test.skipIf(process.platform === "win32")("a symlinked shared directory skips presence without touching its target", async () => {
+  const { directory, location, files } = fixture()
+  const target = mkdtempSync(join(root, "target-"))
+  mkdirSync(join(target, "clients"))
+  // Looks like a stale peer; following the symlink would delete it.
+  const victim = join(target, "clients", "00000000-0000-0000-0000-000000000000.json")
+  writeFileSync(victim, "{}")
+  symlinkSync(target, join(files, ".."))
+  const client = createTerminalClients(() => ({ location, sessions: [] }))
+  try {
+    expect(await client.claim("question", "unknown")).toBe(true)
+    expect(readdirSync(join(target, "clients"))).toEqual(["00000000-0000-0000-0000-000000000000.json"])
+    expect(readdirSync(directory)).toHaveLength(1)
   } finally { client.dispose() }
 })
 

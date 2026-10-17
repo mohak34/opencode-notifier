@@ -5,18 +5,17 @@ import { tmpdir } from "os"
 import { createV2Notifier } from "./v2"
 import type { Delivery } from "./notifier"
 import type { OpenCodeEvent, SessionMessageUser } from "@opencode/client"
+import { createDeliveryClaimer } from "./claim"
 
 const fixture = mkdtempSync(join(tmpdir(), "notifier-v2-test-"))
 const configPath = join(fixture, "config.json")
 const commandLog = join(fixture, "commands.txt")
 const commandScript = join(fixture, "record-command.mjs")
 writeFileSync(commandScript, 'import { appendFileSync } from "node:fs"; appendFileSync(process.argv[2], process.argv[3]+"\\n")')
-// Delivery claims are machine-wide marker files under the temp directory; keep them in the fixture.
-const oldTmpdir = process.env.TMPDIR
-process.env.TMPDIR = fixture
+// Share on-disk claims across simulated terminals inside an isolated temp root,
+// so these tests never read or write a running session's markers.
+const claim = createDeliveryClaimer(fixture)
 afterAll(() => {
-  if (oldTmpdir === undefined) delete process.env.TMPDIR
-  else process.env.TMPDIR = oldTmpdir
   rmSync(fixture, { recursive: true, force: true })
 })
 let eventID = 0
@@ -65,7 +64,7 @@ async function exercise(events: OpenCodeEvent[], options: {
       context: async () => [{ id: "message", type: "user", text: "hello", time: { created: Date.now() - (options.messageAge ?? 1000) } } satisfies SessionMessageUser],
     },
     permission: { list: async () => [] },
-  } as never, { directory: fixture }, options.delivery ?? "terminal")
+  } as never, { directory: fixture }, options.delivery ?? "terminal", { claim: async (key, _sessionID, valid) => valid() && claim(key) })
   try {
     for (const input of events) await notifier.event(input)
     return writes.filter(w => w.includes("PROBE_"))
