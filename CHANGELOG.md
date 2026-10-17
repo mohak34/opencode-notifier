@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.0-beta.0] - 2026-10-17
+
 ### Fixed
 
 - KDE focus suppression and jump-back accept KWin UUID window IDs and resolve the originating terminal/editor through process ancestry, so background VS Code clients no longer capture Ghostty; explicit IDs override both checks and ambiguous or closed targets never redirect to another terminal (#141; issue #133).
