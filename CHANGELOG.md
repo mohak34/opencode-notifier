@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [1.1.0-beta.0] - 2026-10-17
+## [1.1.0] - 2026-10-17
 
 ### Fixed
 
@@ -17,11 +17,16 @@ All notable changes to this project will be documented in this file.
 
 - V2 clients now share open-session presence as well as event claims; when no eligible client has the session open, alerts still use the first claim, and V1 delivery is unchanged.
 - No config changes. Terminals sharing a normal temp directory still deliver each alert once, and existing claim directories keep working.
+- `1.1.0` and `1.1.0-beta.0` contain the same implementation and differ only in the package version.
 
 ### Contributors
 
 - Thanks to @kriss-spy for the KDE focus and V2 session routing fixes in #141 and the Linux action lifetime fix in #142.
 - Thanks to @YuriNek0 for reporting and fixing the claim cleanup issue in #146.
+
+## [1.1.0-beta.0] - 2026-10-17
+
+Same implementation as v1.1.0, with the prerelease package version for npm's `beta` dist-tag.
 
 ## [1.0.0] - 2026-10-14
 
