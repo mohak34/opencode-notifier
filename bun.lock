@@ -5,7 +5,7 @@
     "": {
       "name": "@mohak34/opencode-notifier",
       "dependencies": {
-        "@particle/dbus-next": "^0.11.4",
+        "@particle/dbus-next": "0.11.4",
         "is-wsl": "^3.1.0",
         "node-notifier": "^10.0.1",
       },
