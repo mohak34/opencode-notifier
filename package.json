@@ -22,7 +22,7 @@
     "gnome-shell-extension"
   ],
   "scripts": {
-    "build": "bun build src/index.ts src/tui.ts --outdir dist --target node --external node-notifier --external dbus-next && tsc --emitDeclarationOnly",
+    "build": "bun build src/index.ts src/tui.ts --outdir dist --target node --external node-notifier --external @particle/dbus-next && tsc --emitDeclarationOnly",
     "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit",
     "test": "bun test"
@@ -35,7 +35,7 @@
     "alerts"
   ],
   "dependencies": {
-    "dbus-next": "^0.10.2",
+    "@particle/dbus-next": "^0.11.4",
     "is-wsl": "^3.1.0",
     "node-notifier": "^10.0.1"
   },

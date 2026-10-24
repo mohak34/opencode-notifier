@@ -1,5 +1,5 @@
 // Runs only inside dbus-run-session: never talks to the user's desktop daemon.
-import dbus from "dbus-next"
+import dbus from "@particle/dbus-next"
 
 const path = "/org/freedesktop/Notifications"
 const name = "org.freedesktop.Notifications"

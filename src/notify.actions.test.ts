@@ -156,7 +156,7 @@ test.skipIf(!linuxDesktop)("handler capacity closes the oldest popup before rele
 test.skipIf(!linuxDesktop || !Bun.which("node"))("pending delivery completes on Node but its idle sender does not keep the client alive", async () => {
   const directory = mkdtempSync(join(tmpdir(), "notifier-node-runtime-"))
   try {
-    const result = await Bun.build({ entrypoints: [notify], target: "node", outdir: directory, naming: "notify.mjs", external: ["dbus-next", "node-notifier"] })
+    const result = await Bun.build({ entrypoints: [notify], target: "node", outdir: directory, naming: "notify.mjs", external: ["@particle/dbus-next", "node-notifier"] })
     expect(result.success).toBe(true)
     symlinkSync(join(import.meta.dir, "../node_modules"), join(directory, "node_modules"))
     const output = await run(`
