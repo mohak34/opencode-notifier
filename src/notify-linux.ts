@@ -1,4 +1,4 @@
-import type { MessageBus } from "dbus-next"
+import type { MessageBus } from "@particle/dbus-next"
 
 const DESTINATION = "org.freedesktop.Notifications"
 const PATH = "/org/freedesktop/Notifications"
@@ -77,7 +77,7 @@ function handleSignal(state: Connection, member: string, id: number, value: unkn
 
 async function connect(): Promise<Connection> {
   const epoch = generation
-  const dbus = (await import("dbus-next")).default
+  const dbus = (await import("@particle/dbus-next")).default
   if (epoch !== generation) throw new Error("notification channel disposed")
   const bus = dbus.sessionBus()
   let fail!: (error: Error) => void
@@ -149,7 +149,7 @@ export function sendLinuxActionNotification(
       // Pending calls keep the client alive until delivery resolves. Idle
       // notification listeners alone must not prolong the client's lifetime.
       state.stream?.ref?.()
-      const dbus = (await import("dbus-next")).default
+      const dbus = (await import("@particle/dbus-next")).default
       if (state.callbacks.size >= MAX_ACTIONS && !(grouping && state.callbacks.has(lastID))) {
         const id = state.callbacks.keys().next().value!
         await bounded(Promise.race([state.failure, state.bus.call(new dbus.Message({
