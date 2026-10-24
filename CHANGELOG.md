@@ -4,11 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [1.1.1-beta.0] - 2026-10-24
+## [1.1.1] - 2026-10-24
 
 ### Fixed
 
 - The Linux D-Bus fallback now uses the maintained `@particle/dbus-next` fork instead of `dbus-next`, which has been unmaintained since 2022. Installs no longer pull in its optional `usocket` build chain (`node-gyp@7`, `request`, `form-data@2`, `tar@6`), which carried critical and high advisories. The fork is pinned to an exact version so a new publish cannot reach installs without a release here. No behavior or config changes (#148).
+
+### Upgrade notes
+
+- No config changes. Linux popups, actions and click commands behave as in 1.1.0.
+- `1.1.1` and `1.1.1-beta.0` contain the same implementation and differ only in the package version.
+
+## [1.1.1-beta.0] - 2026-10-24
+
+Same implementation as v1.1.1, with the prerelease package version for npm's `beta` dist-tag.
 
 ## [1.1.0] - 2026-10-17
 
