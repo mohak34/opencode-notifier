@@ -7,6 +7,11 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - On OpenCode 2, a terminal that would stay silent for an event (its channels off or muted by focus) no longer claims it, so another terminal on the same machine can still alert (issue #147).
+- Over SSH on Linux, an active tmux or Zellij pane no longer mutes alerts when no desktop window can be checked, so bells reach a terminal tab that is in the background (issue #147).
+
+### Upgrade notes
+
+- Local sessions and SSH sessions with a detected desktop window keep the same focus behavior. Over SSH inside tmux or Zellij, alerts now fire even while you are looking at the pane.
 
 ## [1.1.1] - 2026-10-24
 

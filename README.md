@@ -459,7 +459,7 @@ tmux source-file ~/.tmux.conf
 
 ## Focus detection
 
-When `suppressWhenFocused` is `true` (the default), popups, sounds, bells, and V1 event commands are skipped when the terminal running OpenCode is focused. Supported terminal and multiplexer pane checks also apply. V2 server event commands run independently of local focus.
+When `suppressWhenFocused` is `true` (the default), popups, sounds, bells, and V1 event commands are skipped when the terminal running OpenCode is focused. Supported terminal and multiplexer pane checks also apply. Over SSH on Linux, when no desktop window can be checked, an active tmux or Zellij pane does not count as focused, because it cannot tell whether your local terminal is in front; alerts are delivered. V2 server event commands run independently of local focus.
 
 On macOS, focus detection reads the app name from either the `lsappinfo` name=value output or its multiline application report. If no valid name can be extracted, it falls back to AppleScript (`System Events`). Failed queries keep notifications enabled.
 
