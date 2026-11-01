@@ -20,17 +20,16 @@ bun run build
 To try your build in OpenCode, use a throwaway notifier config through `OPENCODE_NOTIFIER_CONFIG_PATH`.
 
 - OpenCode 1: point the `plugin` list in a scratch project's `opencode.json` at your local checkout.
-- OpenCode 2: a local directory plugin is loaded from `index.js` and `tui.js` at the directory root, not from `package.json` exports, so pointing at the checkout loads nothing. Make a shim directory that re-exports the build and list it under `plugins`:
+- OpenCode 2: a local directory plugin is loaded from `index.js` and `tui.js` at the directory root, not from `package.json` exports, so pointing at the checkout loads nothing. From the repo root, make a private shim directory that re-exports the build:
 
   ```bash
-  mkdir -p /tmp/notifier-shim
-  echo 'export { default } from "/path/to/opencode-notifier/dist/index.js"' > /tmp/notifier-shim/index.js
-  echo 'export { default } from "/path/to/opencode-notifier/dist/tui.js"' > /tmp/notifier-shim/tui.js
+  shim=$(mktemp -d)
+  echo "export { default } from \"$PWD/dist/index.js\"" > "$shim/index.js"
+  echo "export { default } from \"$PWD/dist/tui.js\"" > "$shim/tui.js"
+  echo "file://$shim"
   ```
 
-  ```json
-  { "plugins": ["file:///tmp/notifier-shim"] }
-  ```
+  List the printed URL under `plugins`: `{ "plugins": ["file:///tmp/tmp.XXXXXX"] }`.
 
   Run `opencode --standalone` so the test uses a private server instead of your background service.
 
