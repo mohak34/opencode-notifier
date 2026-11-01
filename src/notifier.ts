@@ -119,8 +119,9 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
     if (disposed || !valid()) return
     let muted: Set<Channel> | undefined
     if (key && delivery === "terminal") {
-      muted = mutedChannels(current)
-      if (!deliversAny(current, event, muted, elapsed)) {
+      // Focus is probed only when some channel would deliver at all.
+      muted = deliversAny(current, event, new Set(), elapsed) ? mutedChannels(current) : undefined
+      if (!muted || !deliversAny(current, event, muted, elapsed)) {
         debug(`${event}: nothing to deliver in this terminal, leaving the event to other terminals`)
         return
       }
