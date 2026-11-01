@@ -569,11 +569,14 @@ export function isLinuxTerminalFocused(params: {
   wezTermPaneActive: boolean
   tmuxPaneActive: boolean | null
   zellijPaneActive?: boolean | null
+  // Over SSH, pane state on this host says nothing about whether the local terminal is in front.
+  ssh?: boolean
 }): boolean {
-  const { cachedWindowId, currentWindowId, wezTermPaneActive, tmuxPaneActive, zellijPaneActive } = params
+  const { cachedWindowId, currentWindowId, wezTermPaneActive, tmuxPaneActive, zellijPaneActive, ssh } = params
   if (zellijPaneActive === false) return false
 
   if (!cachedWindowId) {
+    if (ssh) return false
     if (!wezTermPaneActive) return false
     if (tmuxPaneActive !== null) return tmuxPaneActive
     if (zellijPaneActive != null) return zellijPaneActive
@@ -627,6 +630,7 @@ export function isTerminalFocused(): boolean {
       debugFocusState("linux focus: KDE originating window is unknown, notifying")
       return false
     }
+    const ssh = !!(process.env.SSH_CONNECTION || process.env.SSH_TTY)
     const tmuxPaneActive = process.env.TMUX ? isTmuxPaneActive() : null
     const currentWindowId = getActiveWindowId()
     const focused = isLinuxTerminalFocused({
@@ -635,9 +639,10 @@ export function isTerminalFocused(): boolean {
       wezTermPaneActive: isWezTermPaneActive(),
       tmuxPaneActive,
       zellijPaneActive,
+      ssh,
     })
     debugFocusState(
-      `linux focus: backend=${getLinuxFocusBackendName()} session=${process.env.XDG_SESSION_TYPE ?? "?"} desktop=${process.env.XDG_CURRENT_DESKTOP ?? process.env.DESKTOP_SESSION ?? "?"} cached=${cachedWindowId ?? "null"} current=${currentWindowId ?? "null"} tmux=${String(tmuxPaneActive)} zellij=${String(zellijPaneActive)} focused=${focused}`
+      `linux focus: backend=${getLinuxFocusBackendName()} session=${process.env.XDG_SESSION_TYPE ?? "?"} desktop=${process.env.XDG_CURRENT_DESKTOP ?? process.env.DESKTOP_SESSION ?? "?"} cached=${cachedWindowId ?? "null"} current=${currentWindowId ?? "null"} tmux=${String(tmuxPaneActive)} zellij=${String(zellijPaneActive)} ssh=${ssh} focused=${focused}`
     )
     return focused
   } catch {

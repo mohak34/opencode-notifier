@@ -17,7 +17,21 @@ bun run typecheck
 bun run build
 ```
 
-To try your build in OpenCode, point a scratch project's `opencode.json` at your local checkout and use a throwaway config through `OPENCODE_NOTIFIER_CONFIG_PATH`.
+To try your build in OpenCode, use a throwaway notifier config through `OPENCODE_NOTIFIER_CONFIG_PATH`.
+
+- OpenCode 1: point the `plugin` list in a scratch project's `opencode.json` at your local checkout.
+- OpenCode 2: a local directory plugin is loaded from `index.js` and `tui.js` at the directory root, not from `package.json` exports, so pointing at the checkout loads nothing. From the repo root, make a private shim directory that re-exports the build:
+
+  ```bash
+  shim=$(mktemp -d) &&
+    echo "export { default } from \"$PWD/dist/index.js\"" > "$shim/index.js" &&
+    echo "export { default } from \"$PWD/dist/tui.js\"" > "$shim/tui.js" &&
+    echo "file://$shim"
+  ```
+
+  List the printed URL under `plugins`: `{ "plugins": ["file:///tmp/tmp.XXXXXX"] }`.
+
+  Run `opencode --standalone` so the test uses a private server instead of your background service.
 
 ## Rules for a PR
 

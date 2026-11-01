@@ -129,6 +129,17 @@ describe("isLinuxTerminalFocused", () => {
     })).toBe(false)
   })
 
+  test("over SSH without a window id, an active tmux or Zellij pane does not count as focus", () => {
+    expect(isLinuxTerminalFocused({
+      cachedWindowId: null, currentWindowId: null, wezTermPaneActive: true,
+      tmuxPaneActive: true, ssh: true,
+    })).toBe(false)
+    expect(isLinuxTerminalFocused({
+      cachedWindowId: null, currentWindowId: null, wezTermPaneActive: true,
+      tmuxPaneActive: null, zellijPaneActive: true, ssh: true,
+    })).toBe(false)
+  })
+
   test("falls back to tmux pane state when window id is unavailable", () => {
     expect(
       isLinuxTerminalFocused({

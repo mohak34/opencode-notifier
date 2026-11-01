@@ -2,7 +2,8 @@ import { basename } from "path"
 import { loadConfig } from "./config"
 import type { EventType, NotifierConfig } from "./config"
 import { claimDelivery } from "./claim"
-import { extractAgentNameFromSessionTitle, handleEvent, shouldResolveSessionContextForEvent } from "./delivery"
+import { deliversAny, extractAgentNameFromSessionTitle, handleEvent, shouldResolveSessionContextForEvent } from "./delivery"
+import { debugFocusState as debug } from "./focus"
 import { shouldSuppressPermissionAlert, prunePermissionAlertState } from "./permission-dedupe"
 
 // Allow immediate auto-approval to settle before checking the pending list.
@@ -117,6 +118,10 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
     }
     if (disposed || !valid()) return
     if (key && delivery === "terminal") {
+      if (!deliversAny(current, event)) {
+        debug(`${event}: no channel enabled in this terminal, leaving the event to other terminals`)
+        return
+      }
       const identity = `${directory}\0${key}`
       if (!(hooks.claim ? await hooks.claim(identity, sessionID, () => !disposed && valid()) : claimDelivery(identity))) return
     }

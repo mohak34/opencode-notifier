@@ -88,6 +88,13 @@ export function shouldResolveSessionContextForEvent(config: NotifierConfig, even
     .some(value => value.includes("{agentName}") || value.includes("{sessionTitle}")))
 }
 
+// Whether the config enables any channel for this event. V2 terminals check this before claiming
+// an event, so a terminal with every channel off never blocks one that would alert. Focus is checked
+// after the claim: probes can block for seconds, so only the winning terminal runs them.
+export function deliversAny(config: NotifierConfig, eventType: EventType): boolean {
+  return CHANNELS.some(channel => config.events[eventType][channel] && (channel !== "command" || config.command.enabled))
+}
+
 export async function handleEvent(
   config: NotifierConfig,
   eventType: EventType,

@@ -459,7 +459,7 @@ tmux source-file ~/.tmux.conf
 
 ## Focus detection
 
-When `suppressWhenFocused` is `true` (the default), popups, sounds, bells, and V1 event commands are skipped when the terminal running OpenCode is focused. Supported terminal and multiplexer pane checks also apply. V2 server event commands run independently of local focus.
+When `suppressWhenFocused` is `true` (the default), popups, sounds, bells, and V1 event commands are skipped when the terminal running OpenCode is focused. Supported terminal and multiplexer pane checks also apply. Over SSH on Linux, when no desktop window can be checked, an active tmux or Zellij pane does not count as focused, because it cannot tell whether your local terminal is in front; alerts are delivered. V2 server event commands run independently of local focus.
 
 On macOS, focus detection reads the app name from either the `lsappinfo` name=value output or its multiline application report. If no valid name can be extracted, it falls back to AppleScript (`System Events`). Failed queries keep notifications enabled.
 
@@ -527,11 +527,11 @@ Work from third-party delegation plugins without native child-session events, or
 
 **Unsupported compositors**: Wayland has no standard protocol for querying the focused window. Each compositor has its own IPC. Without a window backend, supported pane checks provide a best-effort fallback. If neither can determine focus, notifications are allowed.
 
-**tmux/screen**: When running inside tmux, focus detection uses tmux pane state (`session_attached`, `window_active`, `pane_active`) via `tmux display-message`. This keeps suppression accurate when switching panes/windows/sessions. On Linux setups where window focus cannot be detected at all, tmux pane state is also used as a best-effort fallback. GNU Screen has no pane detection, but ordinary terminal-window focus detection can still suppress notifications.
+**tmux/screen**: When running inside tmux, focus detection uses tmux pane state (`session_attached`, `window_active`, `pane_active`) via `tmux display-message`. This keeps suppression accurate when switching panes/windows/sessions. On Linux setups where window focus cannot be detected at all, tmux pane state is also used as a best-effort fallback, except over SSH, where alerts are always delivered. GNU Screen has no pane detection, but ordinary terminal-window focus detection can still suppress notifications.
 
 **WezTerm panes**: When running in WezTerm with `WEZTERM_PANE` set, focus suppression is pane-aware via `wezterm cli list-clients --format json`. This means notifications are shown when you switch to a different WezTerm pane/tab.
 
-**Zellij panes**: With `ZELLIJ_SESSION_NAME` and `ZELLIJ_PANE_ID` set, suppression also checks `zellij --session <name> action list-clients`. Switching away from the OpenCode pane or tab allows notifications even when the terminal window stays focused. With multiple clients, the pane counts as focused if any attached client focuses it. A missing tool, failed query, or detached session allows notifications. On Linux without window detection, pane focus is a best-effort fallback, as with tmux.
+**Zellij panes**: With `ZELLIJ_SESSION_NAME` and `ZELLIJ_PANE_ID` set, suppression also checks `zellij --session <name> action list-clients`. Switching away from the OpenCode pane or tab allows notifications even when the terminal window stays focused. With multiple clients, the pane counts as focused if any attached client focuses it. A missing tool, failed query, or detached session allows notifications. On Linux without window detection, pane focus is a best-effort fallback, as with tmux, and is ignored over SSH.
 
 **Fail-open design**: If window and supported pane checks cannot determine focus, focus suppression allows notifications. Other settings such as event disabling and minimum duration still apply.
 

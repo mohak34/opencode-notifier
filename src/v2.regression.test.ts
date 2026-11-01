@@ -36,12 +36,13 @@ async function exercise(events: OpenCodeEvent[], options: {
   agentName?: string
   sessionLocation?: { directory: string; workspaceID?: string }
   onGet?: () => void
+  silent?: boolean
 } = {}) {
   writeFileSync(configPath, JSON.stringify({
     suppressWhenFocused: false, sound: false, bell: false, notificationSystem: "ghostty",
     minDuration: options.minDuration ?? 0,
     command: { enabled: options.command ?? false, path: process.execPath, args: [commandScript, commandLog, "{event}"], minDuration: options.commandMinDuration ?? 0 },
-    events: { session_started: false, client_connected: false, user_message: { notification: true }, complete: { notification: true }, subagent_complete: options.agentName ? { notification: true } : false },
+    events: { session_started: false, client_connected: false, user_message: { notification: true }, complete: options.silent ? false : { notification: true }, subagent_complete: options.agentName ? { notification: true } : false },
     messages: { user_message: "PROBE_USER {turn}", complete: "PROBE_DONE {turn}", error: "PROBE_ERROR {turn}", question: "PROBE_QUESTION {turn}", subagent_complete: "PROBE_AGENT {agentName} {turn}" },
   }))
   const oldConfig = process.env.OPENCODE_NOTIFIER_CONFIG_PATH
@@ -112,6 +113,12 @@ test("terminals on one machine alert once for an event they both receive", async
   expect((await exercise([finished])).length).toBe(1)
   expect((await exercise([finished])).length).toBe(0)
   expect((await exercise([event("session.execution.succeeded", { sessionID: "shared" })])).length).toBe(1)
+})
+
+test("a terminal with nothing to deliver leaves the event to another terminal", async () => {
+  const finished = event("session.execution.succeeded", { sessionID: "silent-first" })
+  expect((await exercise([finished], { silent: true })).length).toBe(0)
+  expect((await exercise([finished])).length).toBe(1)
 })
 
 test("a new run clears error suppression", async () => {
