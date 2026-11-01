@@ -23,10 +23,10 @@ To try your build in OpenCode, use a throwaway notifier config through `OPENCODE
 - OpenCode 2: a local directory plugin is loaded from `index.js` and `tui.js` at the directory root, not from `package.json` exports, so pointing at the checkout loads nothing. From the repo root, make a private shim directory that re-exports the build:
 
   ```bash
-  shim=$(mktemp -d)
-  echo "export { default } from \"$PWD/dist/index.js\"" > "$shim/index.js"
-  echo "export { default } from \"$PWD/dist/tui.js\"" > "$shim/tui.js"
-  echo "file://$shim"
+  shim=$(mktemp -d) &&
+    echo "export { default } from \"$PWD/dist/index.js\"" > "$shim/index.js" &&
+    echo "export { default } from \"$PWD/dist/tui.js\"" > "$shim/tui.js" &&
+    echo "file://$shim"
   ```
 
   List the printed URL under `plugins`: `{ "plugins": ["file:///tmp/tmp.XXXXXX"] }`.
