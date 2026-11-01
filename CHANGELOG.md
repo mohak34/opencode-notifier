@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [1.1.2-beta.0] - 2026-11-01
+## [1.1.2] - 2026-11-01
 
 ### Fixed
 
@@ -14,6 +14,11 @@ All notable changes to this project will be documented in this file.
 ### Upgrade notes
 
 - Local sessions and SSH sessions with a detected desktop window keep the same focus behavior. Over SSH inside tmux or Zellij with no detected desktop window, alerts now fire even while you are looking at the pane.
+- `1.1.2` and `1.1.2-beta.0` contain the same implementation and differ only in the package version.
+
+## [1.1.2-beta.0] - 2026-11-01
+
+Same implementation as v1.1.2, with the prerelease package version for npm's `beta` dist-tag.
 
 ## [1.1.1] - 2026-10-24
 
