@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 
 ### Upgrade notes
 
-- Local sessions and SSH sessions with a detected desktop window keep the same focus behavior. Over SSH inside tmux or Zellij, alerts now fire even while you are looking at the pane.
+- Local sessions and SSH sessions with a detected desktop window keep the same focus behavior. Over SSH inside tmux or Zellij with no detected desktop window, alerts now fire even while you are looking at the pane.
 
 ## [1.1.1] - 2026-10-24
 
