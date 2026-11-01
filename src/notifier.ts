@@ -118,7 +118,7 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
     }
     if (disposed || !valid()) return
     if (key && delivery === "terminal") {
-      if (!deliversAny(current, event, elapsed)) {
+      if (!deliversAny(current, event)) {
         debug(`${event}: no channel enabled in this terminal, leaving the event to other terminals`)
         return
       }

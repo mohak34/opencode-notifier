@@ -88,24 +88,10 @@ export function shouldResolveSessionContextForEvent(config: NotifierConfig, even
     .some(value => value.includes("{agentName}") || value.includes("{sessionTitle}")))
 }
 
-// Channels focus suppression mutes right now. Focus is only queried when some channel cares about it.
-function mutedChannels(config: NotifierConfig): Set<Channel> {
-  const focusChannels = config.suppressWhenFocused === true ? CHANNELS : config.suppressWhenFocused || []
-  return new Set<Channel>(focusChannels.length > 0 && isTerminalFocused() ? focusChannels : [])
-}
-
-function isTooShort(config: NotifierConfig, eventType: EventType, elapsedSeconds?: number | null): boolean {
-  return (eventType === "complete" || eventType === "subagent_complete") &&
-    typeof elapsedSeconds === "number" &&
-    Number.isFinite(elapsedSeconds) &&
-    elapsedSeconds < config.minDuration
-}
-
 // Whether the config enables any channel for this event. V2 terminals check this before claiming
 // an event, so a terminal with every channel off never blocks one that would alert. Focus is checked
 // after the claim: probes can block for seconds, so only the winning terminal runs them.
-export function deliversAny(config: NotifierConfig, eventType: EventType, elapsedSeconds?: number | null): boolean {
-  if (isTooShort(config, eventType, elapsedSeconds)) return false
+export function deliversAny(config: NotifierConfig, eventType: EventType): boolean {
   return CHANNELS.some(channel => config.events[eventType][channel] && (channel !== "command" || config.command.enabled))
 }
 
@@ -119,9 +105,21 @@ export async function handleEvent(
   agentName?: string | null,
   focusSession?: (sessionID: string) => void
 ): Promise<void> {
-  if (isTooShort(config, eventType, elapsedSeconds)) return
-  const muted = mutedChannels(config)
-  if (muted.size === CHANNELS.length) return
+  // Focus is only queried when some channel cares about it.
+  const focusChannels = config.suppressWhenFocused === true ? CHANNELS : config.suppressWhenFocused || []
+  const muted = new Set<Channel>(focusChannels.length > 0 && isTerminalFocused() ? focusChannels : [])
+  if (muted.size === CHANNELS.length) {
+    return
+  }
+
+  if (
+    (eventType === "complete" || eventType === "subagent_complete") &&
+    typeof elapsedSeconds === "number" &&
+    Number.isFinite(elapsedSeconds) &&
+    elapsedSeconds < config.minDuration
+  ) {
+    return
+  }
 
   const promises: Promise<void>[] = []
 
