@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- On OpenCode 2, a terminal that would stay silent for an event (its channels off or muted by focus) no longer claims it, so another terminal on the same machine can still alert (issue #147).
+
 ## [1.1.1] - 2026-10-24
 
 ### Fixed

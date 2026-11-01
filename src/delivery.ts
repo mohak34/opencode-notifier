@@ -88,6 +88,26 @@ export function shouldResolveSessionContextForEvent(config: NotifierConfig, even
     .some(value => value.includes("{agentName}") || value.includes("{sessionTitle}")))
 }
 
+// Channels focus suppression mutes right now. Focus is only queried when some channel cares about it.
+export function mutedChannels(config: NotifierConfig): Set<Channel> {
+  const focusChannels = config.suppressWhenFocused === true ? CHANNELS : config.suppressWhenFocused || []
+  return new Set<Channel>(focusChannels.length > 0 && isTerminalFocused() ? focusChannels : [])
+}
+
+function isTooShort(config: NotifierConfig, eventType: EventType, elapsedSeconds?: number | null): boolean {
+  return (eventType === "complete" || eventType === "subagent_complete") &&
+    typeof elapsedSeconds === "number" &&
+    Number.isFinite(elapsedSeconds) &&
+    elapsedSeconds < config.minDuration
+}
+
+// Whether handleEvent would deliver at least one channel. V2 terminals check this before claiming
+// an event, so a terminal that stays silent never blocks another terminal that would alert.
+export function deliversAny(config: NotifierConfig, eventType: EventType, muted: Set<Channel>, elapsedSeconds?: number | null): boolean {
+  if (isTooShort(config, eventType, elapsedSeconds)) return false
+  return CHANNELS.some(channel => config.events[eventType][channel] && !muted.has(channel) && (channel !== "command" || config.command.enabled))
+}
+
 export async function handleEvent(
   config: NotifierConfig,
   eventType: EventType,
@@ -96,21 +116,10 @@ export async function handleEvent(
   sessionTitle?: string | null,
   sessionID?: string | null,
   agentName?: string | null,
-  focusSession?: (sessionID: string) => void
+  focusSession?: (sessionID: string) => void,
+  muted: Set<Channel> = mutedChannels(config)
 ): Promise<void> {
-  // Focus is only queried when some channel cares about it.
-  const focusChannels = config.suppressWhenFocused === true ? CHANNELS : config.suppressWhenFocused || []
-  const muted = new Set<Channel>(focusChannels.length > 0 && isTerminalFocused() ? focusChannels : [])
-  if (muted.size === CHANNELS.length) {
-    return
-  }
-
-  if (
-    (eventType === "complete" || eventType === "subagent_complete") &&
-    typeof elapsedSeconds === "number" &&
-    Number.isFinite(elapsedSeconds) &&
-    elapsedSeconds < config.minDuration
-  ) {
+  if (muted.size === CHANNELS.length || isTooShort(config, eventType, elapsedSeconds)) {
     return
   }
 
