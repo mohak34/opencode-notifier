@@ -1,8 +1,8 @@
 import { basename } from "path"
 import { loadConfig } from "./config"
-import type { Channel, EventType, NotifierConfig } from "./config"
+import type { EventType, NotifierConfig } from "./config"
 import { claimDelivery } from "./claim"
-import { deliversAny, extractAgentNameFromSessionTitle, handleEvent, mutedChannels, shouldResolveSessionContextForEvent } from "./delivery"
+import { deliversAny, extractAgentNameFromSessionTitle, handleEvent, shouldResolveSessionContextForEvent } from "./delivery"
 import { debugFocusState as debug } from "./focus"
 import { shouldSuppressPermissionAlert, prunePermissionAlertState } from "./permission-dedupe"
 
@@ -117,12 +117,9 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
       agentName = info.agentName ?? null
     }
     if (disposed || !valid()) return
-    let muted: Set<Channel> | undefined
     if (key && delivery === "terminal") {
-      // Focus is probed only when some channel would deliver at all.
-      muted = deliversAny(current, event, new Set(), elapsed) ? mutedChannels(current) : undefined
-      if (!muted || !deliversAny(current, event, muted, elapsed)) {
-        debug(`${event}: nothing to deliver in this terminal, leaving the event to other terminals`)
+      if (!deliversAny(current, event, elapsed)) {
+        debug(`${event}: no channel enabled in this terminal, leaving the event to other terminals`)
         return
       }
       const identity = `${directory}\0${key}`
@@ -131,7 +128,7 @@ export function createNotifier(access: SessionAccess, directory: string, deliver
     if (disposed || !valid()) return
     commit?.()
     const project = directory ? (current.showFullPath ? directory : basename(directory)) : null
-    await handleEvent(current, event, project, elapsed, sessionTitle, sessionID, agentName ?? extractAgentNameFromSessionTitle(sessionTitle), hooks.focusSession, muted)
+    await handleEvent(current, event, project, elapsed, sessionTitle, sessionID, agentName ?? extractAgentNameFromSessionTitle(sessionTitle), hooks.focusSession)
   }
 
   function track(sessionID: string, parentID?: string | null) {

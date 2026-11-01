@@ -89,7 +89,7 @@ export function shouldResolveSessionContextForEvent(config: NotifierConfig, even
 }
 
 // Channels focus suppression mutes right now. Focus is only queried when some channel cares about it.
-export function mutedChannels(config: NotifierConfig): Set<Channel> {
+function mutedChannels(config: NotifierConfig): Set<Channel> {
   const focusChannels = config.suppressWhenFocused === true ? CHANNELS : config.suppressWhenFocused || []
   return new Set<Channel>(focusChannels.length > 0 && isTerminalFocused() ? focusChannels : [])
 }
@@ -101,11 +101,12 @@ function isTooShort(config: NotifierConfig, eventType: EventType, elapsedSeconds
     elapsedSeconds < config.minDuration
 }
 
-// Whether handleEvent would deliver at least one channel. V2 terminals check this before claiming
-// an event, so a terminal that stays silent never blocks another terminal that would alert.
-export function deliversAny(config: NotifierConfig, eventType: EventType, muted: Set<Channel>, elapsedSeconds?: number | null): boolean {
+// Whether the config enables any channel for this event. V2 terminals check this before claiming
+// an event, so a terminal with every channel off never blocks one that would alert. Focus is checked
+// after the claim: probes can block for seconds, so only the winning terminal runs them.
+export function deliversAny(config: NotifierConfig, eventType: EventType, elapsedSeconds?: number | null): boolean {
   if (isTooShort(config, eventType, elapsedSeconds)) return false
-  return CHANNELS.some(channel => config.events[eventType][channel] && !muted.has(channel) && (channel !== "command" || config.command.enabled))
+  return CHANNELS.some(channel => config.events[eventType][channel] && (channel !== "command" || config.command.enabled))
 }
 
 export async function handleEvent(
@@ -116,12 +117,11 @@ export async function handleEvent(
   sessionTitle?: string | null,
   sessionID?: string | null,
   agentName?: string | null,
-  focusSession?: (sessionID: string) => void,
-  muted: Set<Channel> = mutedChannels(config)
+  focusSession?: (sessionID: string) => void
 ): Promise<void> {
-  if (muted.size === CHANNELS.length || isTooShort(config, eventType, elapsedSeconds)) {
-    return
-  }
+  if (isTooShort(config, eventType, elapsedSeconds)) return
+  const muted = mutedChannels(config)
+  if (muted.size === CHANNELS.length) return
 
   const promises: Promise<void>[] = []
 
