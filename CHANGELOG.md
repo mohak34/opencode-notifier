@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.2-beta.0] - 2026-11-01
+
 ### Fixed
 
 - On OpenCode 2, a terminal whose config turns off every channel for an event no longer claims it, so another terminal on the same machine can still alert (#149; issue #147).
