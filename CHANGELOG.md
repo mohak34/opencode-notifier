@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.3-beta.0] - 2026-11-14
+
 ### Fixed
 
 - On WSL, toasts now work right after a fresh install or update, without a manual `chmod +x` on node-notifier's snoreToast executable (#152; issue #151).
