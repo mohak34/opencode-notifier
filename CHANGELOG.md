@@ -4,15 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [1.1.3-beta.0] - 2026-11-14
+## [1.1.3] - 2026-11-14
 
 ### Fixed
 
 - On WSL, toasts now work right after a fresh install or update, without a manual `chmod +x` on node-notifier's snoreToast executable (#152; issue #151).
 
+### Upgrade notes
+
+- Nothing changes outside WSL. `1.1.3` and `1.1.3-beta.0` contain the same implementation and differ only in the package version.
+
 ### Contributors
 
 - Thanks to @cardin for reporting and fixing the WSL toast issue in #152.
+
+## [1.1.3-beta.0] - 2026-11-14
+
+Same implementation as v1.1.3, with the prerelease package version for npm's `beta` dist-tag.
 
 ## [1.1.2] - 2026-11-01
 
