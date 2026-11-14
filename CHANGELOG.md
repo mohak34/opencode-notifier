@@ -6,7 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- On WSL, a fresh install or update no longer needs a manual `chmod +x` on node-notifier's bundled snoreToast executable. The plugin restores the execute bit when it loads, so toast notifications work immediately.
+- On WSL, toasts now work right after a fresh install or update, without a manual `chmod +x` on node-notifier's snoreToast executable (#152; issue #151).
+
+### Contributors
+
+- Thanks to @cardin for reporting and fixing the WSL toast issue in #152.
 
 ## [1.1.2] - 2026-11-01
 
