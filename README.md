@@ -74,6 +74,8 @@ For sounds, you need one of: `paplay`, `aplay`, `mpv`, or `ffplay`
 
 **WSL**: Set `customIconPath` to a file on the Windows filesystem to avoid icon-path translation issues. You can copy an icon from this repository's `logos` folder. The path is passed to `snoretoast-*.exe`.
 
+The plugin also restores the execute bit on node-notifier's bundled snoreToast executable when it loads, so a fresh install or update does not need a manual `chmod +x`.
+
 In `opencode-notifier.json` config:
 
 ```json
@@ -83,7 +85,7 @@ In `opencode-notifier.json` config:
 }
 ```
 
-- If notifications are not showing up, check out: [missing WSL notification](https://github.com/mikaelbr/node-notifier?tab=readme-ov-file#windows-and-wsl2)
+- If notifications are still not showing up, check out: [missing WSL notification](https://github.com/mikaelbr/node-notifier?tab=readme-ov-file#windows-and-wsl2)
 
 ## Config file
 

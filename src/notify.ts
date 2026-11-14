@@ -4,6 +4,7 @@ import { getLinuxNotificationID, rememberLinuxNotificationID, sendLinuxActionNot
 export { disposeLinuxNotifications } from "./notify-linux"
 import notifier from "node-notifier"
 import isWsl from "is-wsl"
+import { ensureSnoreToastExecutable } from "./snoretoast"
 
 const DEBOUNCE_MS = 1000
 
@@ -13,6 +14,8 @@ let platformNotifier: { notify(notification: notifier.Notification, callback: no
 
 if (platform === "Windows_NT" || isWsl) {
   const { WindowsToaster } = notifier
+  // npm ships the snoreToast executable without +x, which WSL needs to launch it.
+  if (isWsl) ensureSnoreToastExecutable()
   platformNotifier = new WindowsToaster({ withFallback: false })
 } else if (platform === "Linux" || platform.match(/BSD$/)) {
   const { NotifySend } = notifier
