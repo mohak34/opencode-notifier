@@ -118,22 +118,19 @@ export function buildWindowsToastPayload(
   }
 }
 
+// New-Item -Force deletes an existing key, and appID may belong to another app,
+// so a registered ID is left alone. DisplayName is written last to mark a
+// complete registration.
 export function buildWindowsToastScript(payload: WindowsToastPayload): string {
   const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64")
   return `$ErrorActionPreference = 'Stop'
 $payload = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}')) | ConvertFrom-Json
 $appKey = "HKCU:\\Software\\Classes\\AppUserModelId\\$($payload.appId)"
-$registered = Get-ItemProperty -Path $appKey -ErrorAction SilentlyContinue
-$needsIcon = $payload.iconPath -and ($null -eq $registered -or $registered.IconUri -ne $payload.iconPath)
-$staleIcon = -not $payload.iconPath -and $null -ne $registered -and $null -ne $registered.IconUri
-if ($null -eq $registered -or $registered.DisplayName -ne $payload.displayName -or $needsIcon -or $staleIcon) {
-  New-Item -Path $appKey -Force | Out-Null
-  Set-ItemProperty -Path $appKey -Name DisplayName -Value $payload.displayName
-  if ($payload.iconPath) {
-    Set-ItemProperty -Path $appKey -Name IconUri -Value $payload.iconPath
-  } elseif ($staleIcon) {
-    Remove-ItemProperty -Path $appKey -Name IconUri
-  }
+$registered = Get-ItemProperty -LiteralPath $appKey -ErrorAction SilentlyContinue
+if ($null -eq $registered.DisplayName) {
+  if (-not (Test-Path -LiteralPath $appKey)) { New-Item -Path $appKey -Force | Out-Null }
+  if ($payload.iconPath) { Set-ItemProperty -LiteralPath $appKey -Name IconUri -Value $payload.iconPath }
+  Set-ItemProperty -LiteralPath $appKey -Name DisplayName -Value $payload.displayName
 }
 [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
 [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom, ContentType = WindowsRuntime] | Out-Null
