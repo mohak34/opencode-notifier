@@ -74,20 +74,19 @@ export function buildWindowsToastPayload(request: WindowsToastRequest): WindowsT
   }
 }
 
-// New-Item -Force deletes an existing key, and appID may belong to another app,
-// so a registered ID is left alone. DisplayName is written last to mark a
-// complete registration.
+// appID may belong to another app and several terminals may register at once.
+// CreateSubKey opens an existing key without changing it (New-Item -Force would
+// delete it), and DisplayName is written last to mark a complete registration.
 export function buildWindowsToastScript(payload: WindowsToastPayload): string {
   const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64")
   return `$ErrorActionPreference = 'Stop'
 $payload = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}')) | ConvertFrom-Json
-$appKey = "HKCU:\\Software\\Classes\\AppUserModelId\\$($payload.appId)"
-$registered = Get-ItemProperty -LiteralPath $appKey -ErrorAction SilentlyContinue
-if ($null -eq $registered.DisplayName) {
-  if (-not (Test-Path -LiteralPath $appKey)) { New-Item -Path $appKey -Force | Out-Null }
-  if ($payload.iconPath) { Set-ItemProperty -LiteralPath $appKey -Name IconUri -Value $payload.iconPath }
-  Set-ItemProperty -LiteralPath $appKey -Name DisplayName -Value $payload.displayName
+$key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey("Software\\Classes\\AppUserModelId\\$($payload.appId)")
+if ($null -eq $key.GetValue('DisplayName')) {
+  if ($payload.iconPath) { $key.SetValue('IconUri', $payload.iconPath) }
+  $key.SetValue('DisplayName', $payload.displayName)
 }
+$key.Close()
 [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
 [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom, ContentType = WindowsRuntime] | Out-Null
 $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
