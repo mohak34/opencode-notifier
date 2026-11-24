@@ -5,7 +5,7 @@ export { disposeLinuxNotifications } from "./notify-linux"
 import notifier from "node-notifier"
 import isWsl from "is-wsl"
 import { ensureSnoreToastExecutable } from "./snoretoast"
-import { sendWindowsReminderNotification } from "./notify-windows"
+import { deliverWindowsNotification } from "./notify-windows"
 import type { WindowsScenario } from "./config"
 
 const DEBOUNCE_MS = 1000
@@ -251,27 +251,30 @@ export async function sendNotification(
     }
   }
 
-  if ((platform === "Windows_NT" || isWsl) && windowsScenario === "reminder") {
-    if (await sendWindowsReminderNotification(title, message, iconPath, windowsAppID ?? "opencode", isWsl)) {
-      return
-    }
+  const sendDefaultNotification = (): Promise<void> => {
+    return new Promise((resolve) => {
+      // node-notifier's NotifySend only maps the kebab-case "app-name" key to
+      // --app-name; without it daemons label the popup "notify-send".
+      const notificationOptions = (platform === "Linux" || platform.match(/BSD$/)) && !isWsl
+        ? { title, message, timeout, icon: iconPath, "app-name": "opencode" }
+        : buildWindowsNotificationOptions(title, message, timeout, iconPath, windowsAppID)
+
+      platformNotifier.notify(
+        notificationOptions,
+        (_error, response, metadata) => {
+          if (onClick && (response === "activate" || metadata?.activationType === "default" || metadata?.activationType === "activated")) {
+            try { onClick() } catch {}
+          }
+          resolve()
+        }
+      )
+    })
   }
 
-  return new Promise((resolve) => {
-    // node-notifier's NotifySend only maps the kebab-case "app-name" key to
-    // --app-name; without it daemons label the popup "notify-send".
-    const notificationOptions = (platform === "Linux" || platform.match(/BSD$/)) && !isWsl
-      ? { title, message, timeout, icon: iconPath, "app-name": "opencode" }
-      : buildWindowsNotificationOptions(title, message, timeout, iconPath, windowsAppID)
+  if (platform === "Windows_NT" || isWsl) {
+    const request = { title, message, iconPath, appID: windowsAppID ?? "opencode", wsl: isWsl }
+    return deliverWindowsNotification(windowsScenario, request, sendDefaultNotification)
+  }
 
-    platformNotifier.notify(
-      notificationOptions,
-      (_error, response, metadata) => {
-        if (onClick && (response === "activate" || metadata?.activationType === "default" || metadata?.activationType === "activated")) {
-          try { onClick() } catch {}
-        }
-        resolve()
-      }
-    )
-  })
+  return sendDefaultNotification()
 }

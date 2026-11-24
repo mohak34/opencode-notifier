@@ -27,6 +27,10 @@ describe("toWindowsFileUri", () => {
     expect(toWindowsFileUri("C:/Program Files/logo.png", false)).toBe("file:///C:/Program%20Files/logo.png")
   })
 
+  test("translates a WSL mounted Windows path", () => {
+    expect(toWindowsFileUri("/mnt/c/Users/Me/logo.png", true)).toBe("file:///C:/Users/Me/logo.png")
+  })
+
   test("returns null for a WSL filesystem path Windows cannot read", () => {
     expect(toWindowsFileUri("/home/me/.cache/logo.png", true)).toBeNull()
   })
@@ -79,7 +83,8 @@ describe("buildWindowsToastXml", () => {
 describe("buildWindowsToastPayload", () => {
   test("carries the app id, display name, icon path and XML for the PowerShell script", () => {
     const payload = buildWindowsToastPayload(
-      "OpenCode", "done", "C:\\icon.png", "opencode", "reminder", false
+      { title: "OpenCode", message: "done", iconPath: "C:\\icon.png", appID: "opencode", wsl: false },
+      "reminder"
     )
 
     expect(payload.appId).toBe("opencode")
@@ -106,6 +111,7 @@ describe("buildWindowsToastScript", () => {
     expect(script).toContain("Software\\Classes\\AppUserModelId")
     expect(script).toContain("Set-ItemProperty -Path $appKey -Name DisplayName")
     expect(script).toContain("Set-ItemProperty -Path $appKey -Name IconUri")
+    expect(script).toContain("Remove-ItemProperty -Path $appKey -Name IconUri")
     expect(script).toContain("Windows.UI.Notifications.ToastNotificationManager")
     expect(script).toContain("CreateToastNotifier($payload.appId).Show($toast)")
   })
