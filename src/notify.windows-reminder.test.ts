@@ -70,7 +70,7 @@ describe("deliverWindowsNotification", () => {
     expect(execCalls[0].args).toContain("-EncodedCommand")
     expect(execCalls[0].options.windowsHide).toBe(true)
     // A broken PowerShell must not delay the fallback toast for long.
-    expect(execCalls[0].options.timeout).toBeLessThanOrEqual(2000)
+    expect(execCalls[0].options.timeout).toBeLessThanOrEqual(5000)
   })
 
   test("falls back to the regular toast when PowerShell fails", async () => {

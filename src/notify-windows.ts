@@ -7,7 +7,7 @@ import type { WindowsScenario } from "./config"
 const REMINDER_ACTIONS = '<actions><action content="Dismiss" arguments="dismiss" activationType="background"/></actions>'
 
 // Bounds how long a broken PowerShell can delay the fallback toast.
-const POWERSHELL_TIMEOUT_MS = 2000
+const POWERSHELL_TIMEOUT_MS = 5000
 
 // Windows shows this name in notification settings; the configurable appID
 // stays the identity.
@@ -150,15 +150,21 @@ export function sendWindowsReminderNotification(request: WindowsToastRequest): P
   const command = request.wsl ? "powershell.exe" : "powershell"
 
   return new Promise((resolve) => {
-    execFile(
-      command,
-      ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
-      { timeout: POWERSHELL_TIMEOUT_MS, windowsHide: true },
-      (error) => {
-        if (error) debug(`reminder toast failed: ${String(error)}`)
-        resolve(!error)
-      }
-    )
+    const finish = (error: unknown) => {
+      if (error) debug(`reminder toast failed: ${String(error)}`)
+      resolve(!error)
+    }
+    try {
+      execFile(
+        command,
+        ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+        { timeout: POWERSHELL_TIMEOUT_MS, windowsHide: true },
+        finish
+      )
+    } catch (error) {
+      // An oversized command line throws instead of reaching the callback.
+      finish(error)
+    }
   })
 }
 
