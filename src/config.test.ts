@@ -351,6 +351,28 @@ describe("Config", () => {
     expect(config.minDuration).toBe(0)
   })
 
+  test("loadConfig defaults the Windows toast scenario to default", async () => {
+    const { loadConfig } = await import("./config")
+
+    expect(loadConfig().windows).toEqual({ appID: "opencode", scenario: "default" })
+  })
+
+  test("loadConfig parses the reminder Windows toast scenario", async () => {
+    writeFileSync(testConfigPath, JSON.stringify({ windows: { appID: "my-app", scenario: "reminder" } }))
+
+    const { loadConfig } = await import("./config")
+
+    expect(loadConfig().windows).toEqual({ appID: "my-app", scenario: "reminder" })
+  })
+
+  test("loadConfig falls back for an unknown Windows toast scenario", async () => {
+    writeFileSync(testConfigPath, JSON.stringify({ windows: { scenario: "alarm" } }))
+
+    const { loadConfig } = await import("./config")
+
+    expect(loadConfig().windows.scenario).toBe("default")
+  })
+
   test("interpolateMessage substitutes {timestamp} placeholder", async () => {
     const { interpolateMessage } = await import("./config")
     const result = interpolateMessage("Event at {timestamp}", { timestamp: "14:30:05" })

@@ -160,7 +160,7 @@ export async function handleEvent(
       }
     } : undefined
     promises.push(sendNotification(title, message, config.timeout, iconPath, config.notificationSystem, config.linux.grouping,
-      onNotificationClick, config.windows.appID, focusOnClick ? "Jump to terminal" : "Run command"))
+      onNotificationClick, config.windows.appID, focusOnClick ? "Jump to terminal" : "Run command", config.windows.scenario))
   }
 
   if (isEventSoundEnabled(config, eventType) && !muted.has("sound")) {

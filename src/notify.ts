@@ -5,6 +5,8 @@ export { disposeLinuxNotifications } from "./notify-linux"
 import notifier from "node-notifier"
 import isWsl from "is-wsl"
 import { ensureSnoreToastExecutable } from "./snoretoast"
+import { sendWindowsReminderNotification } from "./notify-windows"
+import type { WindowsScenario } from "./config"
 
 const DEBOUNCE_MS = 1000
 
@@ -184,7 +186,8 @@ export async function sendNotification(
   linuxGrouping: boolean = true,
   onClick?: () => void,
   windowsAppID?: string,
-  clickActionLabel: string = LINUX_FOCUS_ACTION_LABEL
+  clickActionLabel: string = LINUX_FOCUS_ACTION_LABEL,
+  windowsScenario: WindowsScenario = "default"
 ): Promise<void> {
   const now = Date.now()
   if (lastNotificationTime[message] && now - lastNotificationTime[message] < DEBOUNCE_MS) {
@@ -246,6 +249,12 @@ export async function sendNotification(
         return sendLinuxNotificationDirect(title, message, timeout, iconPath, true)
       }
     }
+  }
+
+  if ((platform === "Windows_NT" || isWsl) && windowsScenario === "reminder") {
+    const request = { title, message, iconPath, appID: windowsAppID ?? "opencode", wsl: isWsl }
+    // Fail open: when the reminder cannot be shown, fall through to the regular toast.
+    if (await sendWindowsReminderNotification(request)) return
   }
 
   return new Promise((resolve) => {

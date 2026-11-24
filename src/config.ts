@@ -39,8 +39,11 @@ export interface LinuxConfig {
   grouping: boolean
 }
 
+export type WindowsScenario = "default" | "reminder"
+
 export interface WindowsConfig {
   appID: string
+  scenario: WindowsScenario
 }
 
 export interface MessageContext {
@@ -157,6 +160,7 @@ const DEFAULT_CONFIG: NotifierConfig = {
   },
   windows: {
     appID: "opencode",
+    scenario: "default",
   },
   minDuration: 0,
   deferCompleteUntilChildrenIdle: false,
@@ -345,6 +349,7 @@ export function loadConfig(): NotifierConfig {
         appID: typeof userConfig.windows?.appID === "string" && userConfig.windows.appID.length > 0
           ? userConfig.windows.appID
           : DEFAULT_CONFIG.windows.appID,
+        scenario: userConfig.windows?.scenario === "reminder" ? "reminder" : DEFAULT_CONFIG.windows.scenario,
       },
       minDuration:
         typeof userConfig.minDuration === "number" && Number.isFinite(userConfig.minDuration) && userConfig.minDuration >= 0
