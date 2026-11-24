@@ -111,6 +111,10 @@ Create `~/.config/opencode/opencode-notifier.json` with this example configurati
   "linux": {
     "grouping": false
   },
+  "windows": {
+    "appID": "opencode",
+    "scenario": "default"
+  },
   "minDuration": 0,
   "command": {
     "enabled": false,
@@ -207,6 +211,8 @@ Create `~/.config/opencode/opencode-notifier.json` with this example configurati
 - `suppressGhosttySound` - macOS only: when `true` with `notificationSystem: "ghostty"`, skips the plugin's sound to avoid duplicating macOS Notification Center's default sound (default: false)
 - `minDuration` - Suppress `complete` and `subagent_complete` notifications when session finishes faster than this many seconds (default: 0). See [Minimum duration threshold](#minimum-duration-threshold)
 - `linux.grouping` - Linux only: replace notifications in-place instead of stacking (default: false). Actionable popups use D-Bus; plain popups require `notify-send` 0.8+
+- `windows.appID` - Windows and WSL only: AppUserModelID the toast is registered under (default: `"opencode"`). Reminder toasts register it per-user under `HKCU\Software\Classes\AppUserModelId` so Windows will display them
+- `windows.scenario` - Windows and WSL only: `"default"` shows a normal banner, `"reminder"` keeps the toast on screen until the user dismisses it (default: `"default"`). Reminder toasts carry a Dismiss button and register the configured AppUserModelID automatically; Windows drops reminder toasts for an unregistered ID. Reminder toasts do not deliver click callbacks, so `focusOnClick` and `onClickCommand` do not run for them. If PowerShell cannot display the reminder, the plugin falls back to a normal toast
 
 ### Events
 
@@ -382,7 +388,7 @@ scripts you trust.
 }
 ```
 
-On Linux, use the explicit **Run command** action button; popup body clicks are not reliably delivered. The notification daemon must support actions. Actionable popups use a persistent D-Bus connection, so clicks remain available until the daemon closes the notification, including when hovering extends its lifetime. Windows toasts and macOS `node-notifier` deliver their activation callback; AppleScript and Ghostty OSC notifications do not support this command.
+On Linux, use the explicit **Run command** action button; popup body clicks are not reliably delivered. The notification daemon must support actions. Actionable popups use a persistent D-Bus connection, so clicks remain available until the daemon closes the notification, including when hovering extends its lifetime. Windows default toasts and macOS `node-notifier` deliver their activation callback; Windows `reminder` toasts, AppleScript and Ghostty OSC notifications do not support this command.
 
 `focusOnClick` defaults to `true` and enables the built-in KDE/GNOME jump-back when available. On V2, jump-back also selects the completed session in the delivering client, using its tab or session route. Set it to `false` for a script-only action. When both are enabled, clicking runs your script and focuses the terminal. On V2, configure click commands in the local terminal's configuration and event commands on the server. `events.<event>.command` controls event commands only; a click command is available for any enabled popup.
 

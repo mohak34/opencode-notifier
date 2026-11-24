@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `windows.scenario` option: set it to `"reminder"` to keep a Windows or WSL toast on screen until the user dismisses it. The default, `"default"`, keeps the current banner behavior. Reminder toasts register the configured AppUserModelID under `HKCU\Software\Classes\AppUserModelId`, since Windows drops them for an unregistered ID.
+
+### Upgrade notes
+
+- Existing configurations are unchanged: an unset `windows.scenario` behaves as before. Reminder toasts do not run `focusOnClick` or `onClickCommand`.
+
 ## [1.1.3] - 2026-11-14
 
 ### Fixed
