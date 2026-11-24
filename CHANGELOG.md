@@ -6,12 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- `windows.scenario` option: set it to `"reminder"` to keep a Windows or WSL toast on screen until the user dismisses it. The default, `"default"`, keeps the current banner behavior. Reminder toasts register the configured AppUserModelID under `HKCU\Software\Classes\AppUserModelId`, with the display name `OpenCode` and the icon when Windows can read it, since Windows drops them for an unregistered ID.
+- `windows.scenario: "reminder"` keeps a Windows or WSL toast on screen until you dismiss it (#154; issue #153).
 
 ### Upgrade notes
 
-- Existing configurations are unchanged: an unset `windows.scenario` behaves as before. Reminder toasts do not run `focusOnClick` or `onClickCommand`.
-- Reminder toasts write a per-user `HKCU` key that the plugin never removes; delete `HKCU\Software\Classes\AppUserModelId\<appID>` if you stop using the option.
+- Nothing changes unless you set `windows.scenario` to `"reminder"`. Reminder toasts do not run `focusOnClick` or `onClickCommand`, and reminders on WSL are untested.
+- A reminder adds a per-user `HKCU\Software\Classes\AppUserModelId\<appID>` key when that ID is not registered yet; the plugin never removes it, so delete it if you stop using the option.
+
+### Contributors
+
+- Thanks to @NGC13009 for proposing and implementing Windows reminder toasts in #154.
 
 ## [1.1.3] - 2026-11-14
 

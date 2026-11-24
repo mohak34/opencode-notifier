@@ -72,7 +72,7 @@ For sounds, you need one of: `paplay`, `aplay`, `mpv`, or `ffplay`
 - Only `.wav` files work (not mp3)
 - Use full paths like `C:/Users/You/sounds/alert.wav` not `~/`
 
-**WSL**: Set `customIconPath` to a file on the Windows filesystem to avoid icon-path translation issues. You can copy an icon from this repository's `logos` folder. The path is passed to `snoretoast-*.exe`.
+**WSL**: Set `customIconPath` to a file on the Windows filesystem to avoid icon-path translation issues. You can copy an icon from this repository's `logos` folder. Use a drive path (`C:\\...` or `/mnt/c/...`) with `windows.scenario: "reminder"`; other paths show the reminder without an icon.
 
 The plugin also restores the execute bit on node-notifier's bundled snoreToast executable when it loads, so a fresh install or update does not need a manual `chmod +x`.
 
@@ -211,8 +211,8 @@ Create `~/.config/opencode/opencode-notifier.json` with this example configurati
 - `suppressGhosttySound` - macOS only: when `true` with `notificationSystem: "ghostty"`, skips the plugin's sound to avoid duplicating macOS Notification Center's default sound (default: false)
 - `minDuration` - Suppress `complete` and `subagent_complete` notifications when session finishes faster than this many seconds (default: 0). See [Minimum duration threshold](#minimum-duration-threshold)
 - `linux.grouping` - Linux only: replace notifications in-place instead of stacking (default: false). Actionable popups use D-Bus; plain popups require `notify-send` 0.8+
-- `windows.appID` - Windows and WSL only: AppUserModelID the toast is registered under (default: `"opencode"`). Reminder toasts register it per-user under `HKCU\Software\Classes\AppUserModelId` with the display name `OpenCode` and, when Windows can read the icon file, its icon, because Windows drops reminder toasts for an unregistered ID. The plugin never removes that key
-- `windows.scenario` - Windows and WSL only: `"default"` shows a normal banner, `"reminder"` keeps the toast on screen until the user dismisses it (default: `"default"`). Reminder toasts carry a Dismiss button and register the configured AppUserModelID automatically. Reminder toasts do not deliver click callbacks, so `focusOnClick` and `onClickCommand` do not run for them. If PowerShell cannot show the reminder within five seconds, the plugin falls back to a normal toast
+- `windows.appID` - Windows and WSL only: AppUserModelID the toast is sent as (default: `"opencode"`)
+- `windows.scenario` - Windows and WSL only: `"default"` shows a normal banner, `"reminder"` keeps the toast on screen until the user dismisses it (default: `"default"`). Reminder toasts do not run `focusOnClick` or `onClickCommand`. If PowerShell cannot show the reminder within five seconds, the plugin falls back to a normal toast. Windows drops reminders from an unregistered `windows.appID`, so the plugin adds a missing one under `HKCU\Software\Classes\AppUserModelId` with the name `OpenCode` and the icon, leaves an existing one alone, and never removes it. Untested on WSL
 
 ### Events
 
