@@ -4,13 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.0-beta.0] - 2026-11-24
+
 ### Added
 
 - `windows.scenario: "reminder"` keeps a Windows or WSL toast on screen until you dismiss it (#154; issue #153).
 
 ### Upgrade notes
 
-- Nothing changes unless you set `windows.scenario` to `"reminder"`. Reminder toasts do not run `focusOnClick` or `onClickCommand`, and reminders on WSL are untested.
+- Nothing changes unless you set `windows.scenario` to `"reminder"`. Reminder toasts do not run `focusOnClick` or `onClickCommand`, and the final reminder script has not been run on Windows or WSL yet, so please report how it behaves.
 - A reminder adds a per-user `HKCU\Software\Classes\AppUserModelId\<appID>` key when that ID is not registered yet; the plugin never removes it, so delete it if you stop using the option.
 
 ### Contributors
