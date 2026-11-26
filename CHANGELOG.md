@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [1.2.0-beta.0] - 2026-11-24
+## [1.2.0] - 2026-11-26
 
 ### Added
 
@@ -12,12 +12,17 @@ All notable changes to this project will be documented in this file.
 
 ### Upgrade notes
 
-- Nothing changes unless you set `windows.scenario` to `"reminder"`. Reminder toasts do not run `focusOnClick` or `onClickCommand`, and the final reminder script has not been run on Windows or WSL yet, so please report how it behaves.
+- Nothing changes unless you set `windows.scenario` to `"reminder"`. Reminder toasts do not run `focusOnClick` or `onClickCommand`, and reminders are tested on Windows 11 but untested on WSL.
+- `1.2.0` and `1.2.0-beta.0` contain the same implementation and differ only in the package version.
 - A reminder adds a per-user `HKCU\Software\Classes\AppUserModelId\<appID>` key when that ID is not registered yet; the plugin never removes it, so delete it if you stop using the option.
 
 ### Contributors
 
 - Thanks to @NGC13009 for proposing and implementing Windows reminder toasts in #154.
+
+## [1.2.0-beta.0] - 2026-11-24
+
+Same implementation as v1.2.0, with the prerelease package version for npm's `beta` dist-tag.
 
 ## [1.1.3] - 2026-11-14
 
